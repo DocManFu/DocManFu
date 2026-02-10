@@ -1,8 +1,10 @@
 # DocManFu - Development Plan 📄🦞🥋
 
 ## Project Overview
+
 **DocManFu** - Master Your Documents!
 Self-hosted document management system to replace Evernote:
+
 - Python/FastAPI backend with background workers
 - Svelte frontend (NO JSX!)
 - AI-powered document analysis and naming
@@ -12,11 +14,13 @@ Self-hosted document management system to replace Evernote:
 ---
 
 ## Session 1: Database Design & Models
+
 **Goal:** Define data models and database schema
 
 **Claude Code Instructions:**
+
 ```
-I'm building DocManFu - a self-hosted document management system to replace Evernote. 
+I'm building DocManFu - a self-hosted document management system to replace Evernote.
 
 Tech stack: Python/FastAPI, PostgreSQL, background workers (Celery/Redis)
 
@@ -34,13 +38,15 @@ Use SQLAlchemy ORM with Alembic migrations. Include sample data fixtures.
 ---
 
 ## Session 2: Basic FastAPI Setup
+
 **Goal:** Core API structure with health checks
 
 **Claude Code Instructions:**
+
 ```
 Set up FastAPI project structure with:
 - main.py with FastAPI app
-- /health endpoint 
+- /health endpoint
 - Database connection setup (PostgreSQL)
 - Environment configuration (.env support)
 - CORS for frontend
@@ -50,7 +56,7 @@ Set up FastAPI project structure with:
 Project structure:
 /app
   /api
-  /models  
+  /models
   /core
   /db
   main.py
@@ -60,12 +66,16 @@ requirements.txt
 
 **Deliverable:** Working FastAPI app with database connection
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 3: File Upload & Storage
+
 **Goal:** Handle file uploads with validation
 
 **Claude Code Instructions:**
+
 ```
 Create file upload system:
 - POST /api/documents/upload endpoint
@@ -85,12 +95,16 @@ Include proper error handling for:
 
 **Deliverable:** File upload endpoint with validation and storage
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 4: Background Job System
+
 **Goal:** Set up Celery for async processing
 
 **Claude Code Instructions:**
+
 ```
 Set up background job processing with Celery + Redis:
 - Celery configuration and worker setup
@@ -103,21 +117,25 @@ Set up background job processing with Celery + Redis:
 
 Create base task structure for document processing pipeline:
 1. OCR processing task
-2. AI analysis task  
+2. AI analysis task
 3. File organization task
 ```
 
 **Deliverable:** Working Celery setup with job tracking
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 5: OCR Integration
+
 **Goal:** Add OCR processing to background jobs
 
 **Claude Code Instructions:**
+
 ```
 Integrate OCR processing using ocrmypdf:
-- Install and configure ocrmypdf 
+- Install and configure ocrmypdf
 - Create Celery task for OCR processing
 - Handle OCR errors gracefully
 - Extract text content from PDFs
@@ -128,7 +146,7 @@ Integrate OCR processing using ocrmypdf:
 OCR task should:
 - Take document ID as input
 - Run ocrmypdf on uploaded file
-- Extract text content 
+- Extract text content
 - Save searchable PDF
 - Update document record with extracted text
 - Mark OCR job as complete
@@ -136,12 +154,16 @@ OCR task should:
 
 **Deliverable:** Working OCR pipeline with progress tracking
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 6: AI Analysis & Smart Naming
+
 **Goal:** AI-powered document analysis
 
 **Claude Code Instructions:**
+
 ```
 Add AI analysis for smart document naming:
 - Support multiple AI providers (OpenAI, Anthropic, local models)
@@ -154,7 +176,7 @@ Add AI analysis for smart document naming:
 
 AI prompt engineering for document types:
 - Electric/gas bills
-- Bank statements  
+- Bank statements
 - Medical documents
 - Insurance documents
 - Tax documents
@@ -165,12 +187,16 @@ Return structured data: suggested_name, document_type, extracted_metadata, confi
 
 **Deliverable:** AI analysis pipeline with smart naming
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 7: Document Management API
+
 **Goal:** CRUD operations for documents
 
 **Claude Code Instructions:**
+
 ```
 Create full document management API:
 - GET /api/documents - list documents with filtering/pagination
@@ -190,12 +216,16 @@ Include:
 
 **Deliverable:** Complete document management API
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 8: Svelte Frontend - Basic UI
+
 **Goal:** Document viewing interface
 
 **Claude Code Instructions:**
+
 ```
 Create Svelte frontend for document management:
 - Document list view with pagination
@@ -210,7 +240,7 @@ NO JSX - use Svelte syntax only!
 Pages needed:
 - /documents - main list view
 - /documents/{id} - document detail
-- /upload - upload interface  
+- /upload - upload interface
 - /search - search results
 
 Use modern CSS or a CSS framework like Tailwind.
@@ -219,12 +249,16 @@ Include real-time updates for processing status.
 
 **Deliverable:** Basic Svelte frontend with document management
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 9: Upload Script & CLI
+
 **Goal:** Batch upload automation
 
 **Claude Code Instructions:**
+
 ```
 Create Python script to replace current manual workflow:
 - Monitor specified directory for PDF files
@@ -236,7 +270,7 @@ Create Python script to replace current manual workflow:
 - Logging for troubleshooting
 
 Script should replace current OCRmyPDF workflow:
-- Read from /Users/dustin/Documents/PreEvernote  
+- Read from /Users/dustin/Documents/PreEvernote
 - Upload to web service instead of local processing
 - Clean up uploaded files after confirmation
 - Show processing status until completion
@@ -246,12 +280,16 @@ Include systemd service file for continuous monitoring.
 
 **Deliverable:** Automated upload script with monitoring
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 10: Search & Advanced Features
+
 **Goal:** Full-text search and tagging
 
 **Claude Code Instructions:**
+
 ```
 Add advanced search capabilities:
 - Full-text search with PostgreSQL or Elasticsearch
@@ -273,12 +311,16 @@ Frontend improvements:
 
 **Deliverable:** Advanced search and document management features
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 11: Authentication & Multi-User
+
 **Goal:** User management and security
 
 **Claude Code Instructions:**
+
 ```
 Add authentication and multi-user support:
 - JWT-based authentication
@@ -301,12 +343,16 @@ Include middleware for auth protection and rate limiting.
 
 **Deliverable:** Secure multi-user system
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Session 12: Docker & Deployment
+
 **Goal:** Production deployment setup
 
 **Claude Code Instructions:**
+
 ```
 Create production deployment configuration:
 - Multi-stage Dockerfiles (backend, frontend, workers)
@@ -320,7 +366,7 @@ Create production deployment configuration:
 
 Services needed:
 - FastAPI backend
-- Celery workers  
+- Celery workers
 - Redis broker
 - PostgreSQL database
 - Svelte frontend (nginx)
@@ -335,12 +381,16 @@ Include documentation for:
 
 **Deliverable:** Complete deployment setup with documentation
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Final Session: Documentation & Open Source Prep
+
 **Goal:** Project documentation and GitHub setup
 
 **Claude Code Instructions:**
+
 ```
 Prepare DocManFu for open source release:
 - Comprehensive README.md with setup instructions
@@ -356,7 +406,7 @@ Prepare DocManFu for open source release:
 
 GitHub setup (github.com/docmanfu/docmanfu):
 - Issue templates
-- Pull request templates  
+- Pull request templates
 - GitHub Actions for CI/CD
 - Automated testing setup
 - Code formatting (black, prettier)
@@ -365,11 +415,14 @@ GitHub setup (github.com/docmanfu/docmanfu):
 
 **Deliverable:** Complete open source project ready for release
 
+When you're done, update CLAUDE.md with information that will be useful for you in the future to fix and/or enhance this application.
+
 ---
 
 ## Notes for Each Session:
+
 1. **Keep context:** Save important code/decisions between sessions
-2. **Test thoroughly:** Each session should have working functionality  
+2. **Test thoroughly:** Each session should have working functionality
 3. **Document decisions:** Why certain approaches were chosen
 4. **Progressive enhancement:** Each session builds on previous work
 5. **Stay focused:** Don't try to do everything in one session
