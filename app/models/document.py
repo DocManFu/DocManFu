@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import BigInteger, DateTime, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDMixin, TimestampMixin
@@ -18,6 +18,10 @@ class Document(UUIDMixin, TimestampMixin, Base):
     ai_generated_name: Mapped[Optional[str]] = mapped_column(
         String(500), nullable=True
     )
+    document_type: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True
+    )
+    ai_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     file_path: Mapped[str] = mapped_column(String(1000))
     mime_type: Mapped[str] = mapped_column(String(100))
     file_size: Mapped[int] = mapped_column(BigInteger)

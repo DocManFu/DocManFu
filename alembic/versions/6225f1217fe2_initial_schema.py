@@ -52,9 +52,6 @@ def upgrade() -> None:
         sa.Column('tag_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('tags.id'), primary_key=True),
     )
 
-    job_type_enum.create(op.get_bind())
-    job_status_enum.create(op.get_bind())
-
     op.create_table(
         'processing_jobs',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),

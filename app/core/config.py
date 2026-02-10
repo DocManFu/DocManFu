@@ -23,5 +23,12 @@ class Settings(BaseSettings):
     OCR_SKIP_TEXT: bool = True  # Skip pages that already contain text
     OCR_CLEAN: bool = True  # Clean intermediate files after OCR
 
+    # AI Analysis
+    AI_PROVIDER: str = "none"  # "openai", "anthropic", or "none"
+    AI_API_KEY: str = ""  # API key for the configured provider
+    AI_MODEL: str = ""  # Model name, e.g. "gpt-4o-mini", "claude-sonnet-4-5-20250929"
+    AI_MAX_TEXT_LENGTH: int = 4000  # Max chars of document text sent to AI
+    AI_TIMEOUT: int = 60  # Seconds to wait for AI response
+
 
 settings = Settings()

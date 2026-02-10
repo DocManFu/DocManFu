@@ -11,7 +11,7 @@ from pdfminer.high_level import extract_text
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.models.document import Document
-from app.models.processing_job import JobStatus
+from app.models.processing_job import JobStatus, JobType, ProcessingJob
 from app.tasks.base import DocManFuTask
 
 logger = logging.getLogger(__name__)
@@ -138,6 +138,11 @@ def process_ocr(self, job_id: str, document_id: str):
             page_count,
             len(extracted_text),
         )
+
+        # --- Chain: dispatch AI analysis if provider is configured ---
+        if extracted_text and settings.AI_PROVIDER.lower() not in ("none", ""):
+            _dispatch_ai_analysis(db, document_id)
+
     except Exception:
         db.rollback()
         raise
@@ -154,3 +159,28 @@ def _count_pdf_pages(pdf_path: Path) -> int:
             return sum(1 for _ in PDFPage.get_pages(f))
     except Exception:
         return 0
+
+
+def _dispatch_ai_analysis(db, document_id: str):
+    """Create an AI analysis job and dispatch it to Celery."""
+    try:
+        ai_job = ProcessingJob(document_id=document_id, job_type=JobType.ai_analysis)
+        db.add(ai_job)
+        db.commit()
+        db.refresh(ai_job)
+
+        from app.tasks.ai_analysis import process_ai_analysis
+
+        task = process_ai_analysis.delay(str(ai_job.id), str(document_id))
+        ai_job.celery_task_id = task.id
+        db.commit()
+
+        logger.info(
+            "Dispatched AI analysis job %s (celery task %s) for document %s",
+            ai_job.id,
+            task.id,
+            document_id,
+        )
+    except Exception as exc:
+        logger.error("Failed to dispatch AI analysis for document %s: %s", document_id, exc)
+        db.rollback()
