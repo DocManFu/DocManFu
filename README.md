@@ -1,6 +1,12 @@
+<div align="center">
+
+![DocManFu Logo](assets/images/logo.png)
+
 # DocManFu 📄🥋
 
 **Master Your Documents**
+
+</div>
 
 Self-hosted AI-powered document management system that replaces expensive cloud services like Evernote.
 
