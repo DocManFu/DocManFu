@@ -33,7 +33,7 @@ DocManFu is an open-source document management system that combines:
 ## 🛠️ Tech Stack
 
 - **Backend**: Python/FastAPI with Celery background workers
-- **Frontend**: Svelte (clean, modern UI without JSX complexity)
+- **Frontend**: Svelte + UnoCSS (clean, modern UI without JSX complexity)
 - **Database**: PostgreSQL with full-text search
 - **OCR**: OCRmyPDF integration
 - **AI**: Configurable (OpenAI, Anthropic, or local models)

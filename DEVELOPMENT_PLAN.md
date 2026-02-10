@@ -6,7 +6,7 @@
 Self-hosted document management system to replace Evernote:
 
 - Python/FastAPI backend with background workers
-- Svelte frontend (NO JSX!)
+- Svelte frontend with UnoCSS (NO JSX!)
 - AI-powered document analysis and naming
 - OCR integration with existing workflow
 - Open source for community use
@@ -243,7 +243,7 @@ Pages needed:
 - /upload - upload interface
 - /search - search results
 
-Use modern CSS or a CSS framework like Tailwind.
+Use UnoCSS for styling - efficient utility classes without Tailwind verbosity.
 Include real-time updates for processing status.
 ```
 
