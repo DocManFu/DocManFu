@@ -235,8 +235,6 @@ Create Svelte frontend for document management:
 - Processing status indicators
 - Basic responsive design
 
-NO JSX - use Svelte syntax only!
-
 Pages needed:
 - /documents - main list view
 - /documents/{id} - document detail
@@ -244,6 +242,7 @@ Pages needed:
 - /search - search results
 
 Use UnoCSS for styling - efficient utility classes without Tailwind verbosity.
+Use components as much as possible for consistency and DRY principles.
 Include real-time updates for processing status.
 ```
 

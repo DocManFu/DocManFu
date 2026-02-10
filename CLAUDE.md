@@ -24,12 +24,13 @@ app/
   models/               # SQLAlchemy models (document, tag, processing_job)
   api/                  # FastAPI routers
     health.py           # GET /health — app + DB status check
-    documents.py        # POST /api/documents/upload — PDF file upload
+    documents.py        # Document CRUD, search, upload, download, reprocess
     jobs.py             # GET /api/jobs/{job_id}/status — job progress tracking
   tasks/                # Celery background tasks
     base.py             # DocManFuTask base class with DB job tracking
     ocr.py              # OCR processing task (ocrmypdf + pdfminer text extraction)
-    ai_analysis.py      # AI analysis task (stub — Session 6)
+    ai_analysis.py      # AI analysis task (classifies docs, suggests names/tags)
+  core/ai_provider.py   # AI provider abstraction (OpenAI, Anthropic)
     file_organization.py # File org task (stub — future session)
   core/celery_app.py    # Celery app instance and configuration
 alembic/                # Migrations
@@ -64,6 +65,11 @@ scripts/
 - `OCR_DPI` is the resolution for rasterizing image-only pages during OCR (default: `300`)
 - `OCR_SKIP_TEXT` skips OCR on pages that already contain text (default: `true`)
 - `OCR_CLEAN` removes intermediate files after OCR processing (default: `true`)
+- `AI_PROVIDER` selects the AI backend: `"openai"`, `"anthropic"`, or `"none"` to disable (default: `none`)
+- `AI_API_KEY` is the API key for the selected AI provider (required when AI_PROVIDER is not "none")
+- `AI_MODEL` overrides the default model name (defaults: `gpt-4o-mini` for OpenAI, `claude-sonnet-4-5-20250929` for Anthropic)
+- `AI_MAX_TEXT_LENGTH` caps document text sent to the AI to control costs (default: `4000` chars)
+- `AI_TIMEOUT` is the max seconds to wait for an AI API response (default: `60`)
 
 ### FastAPI & API
 - App entry point is `app/main.py` — run with `uvicorn app.main:app --reload`
@@ -72,8 +78,18 @@ scripts/
 - DB sessions in routes use `Depends(get_db)` from `app/db/deps.py`
 - New routers go in `app/api/` and are included via `app.include_router()` in `main.py`
 - Swagger UI auto-generated at `/docs`, ReDoc at `/redoc`
+- **GET /api/documents** — list documents with pagination (offset/limit, max 100), filtering (document_type, tag name, date_from, date_to), and sorting (upload_date|name|size|type, asc|desc). Returns `PaginatedResponse` with `documents`, `total`, `offset`, `limit`. Excludes soft-deleted documents.
+- **GET /api/documents/search** — full-text search via ILIKE across `content_text`, `original_name`, and `ai_generated_name`. Required `q` param. Supports same `document_type` and `tag` filters. Returns `PaginatedResponse`.
+- **GET /api/documents/{id}** — single document with full metadata including `content_text`, `ai_metadata`, `created_at`, `updated_at`, and tags. Returns `DocumentDetail`. 404 if not found or soft-deleted.
+- **PUT /api/documents/{id}** — update `original_name` and/or `tags` (list of tag name strings). Tags are found-or-created (default color `#6B7280`). Setting `tags` replaces all existing tags. Returns updated `DocumentDetail`.
+- **DELETE /api/documents/{id}** — soft-delete (sets `deleted_at`). Returns `{"detail": "Document deleted"}`.
+- **GET /api/documents/{id}/download** — streams the PDF file via `FileResponse`. Uses `ai_generated_name.pdf` as download filename when available, otherwise `original_name`. 404 if file missing from disk.
+- **POST /api/documents/{id}/reprocess** — creates new OCR job and dispatches Celery task. AI analysis auto-follows OCR when `AI_PROVIDER` is configured. 404 if file missing from disk. Returns list of created jobs.
 - **POST /api/documents/upload** — accepts PDF `UploadFile`, validates extension + MIME type, stores in `{UPLOAD_DIR}/YYYY/MM/DD/{uuid}.pdf`, creates `Document` DB record, creates OCR `ProcessingJob`, and dispatches Celery task. Returns 400 for non-PDF, 413 for oversized files. Response includes `job_id` for tracking.
 - **GET /api/jobs/{job_id}/status** — returns job status, progress (0-100), error_message, and result_data
+- Route ordering in `documents.py`: `/search` and `/upload` are defined **before** `/{document_id}` to prevent FastAPI from parsing path literals as UUIDs
+- List/search queries use `selectinload(Document.tags)` to eagerly load tags without affecting pagination counts
+- Pydantic response models use `model_config = {"from_attributes": True}` for ORM-to-schema conversion
 
 ### Background Tasks (Celery)
 - Celery app defined in `app/core/celery_app.py` with Redis as broker and backend
@@ -84,7 +100,7 @@ scripts/
 - Failed tasks auto-retry up to `CELERY_TASK_MAX_RETRIES` times with `CELERY_TASK_RETRY_DELAY` seconds between attempts
 - On final failure, `on_failure` callback marks the ProcessingJob as failed with the error message
 - ProcessingJob has `celery_task_id` (links to Celery) and `result_data` (JSON for task output)
-- Document upload auto-dispatches OCR task; AI analysis and file organization are chained later
+- Document upload auto-dispatches OCR task; OCR auto-dispatches AI analysis when `AI_PROVIDER` is configured and text was extracted
 
 ### OCR Pipeline (`app/tasks/ocr.py`)
 - Uses `ocrmypdf` (Python library) for OCR processing and `pdfminer.six` for text extraction
@@ -98,6 +114,21 @@ scripts/
 - Page count uses `pdfminer.pdfpage.PDFPage.get_pages()`
 - Result data includes: `document_id`, `pages_processed`, `text_length`, `text_extracted` (bool)
 - **Note**: `ocrmypdf.ocr()` holds a global threading lock — only one OCR task runs per Python process. Scale with multiple Celery worker processes, not threads
+
+### AI Analysis Pipeline (`app/tasks/ai_analysis.py` + `app/core/ai_provider.py`)
+- Automatically dispatched after OCR completes (when `AI_PROVIDER != "none"` and text was extracted)
+- **Provider module** (`app/core/ai_provider.py`): abstraction over OpenAI and Anthropic with a common `analyze_document()` function
+- Provider SDKs imported lazily inside the call functions so they aren't required at import time
+- Prompt asks AI to return a JSON object with: `document_type`, `suggested_name`, `suggested_tags`, `extracted_metadata`, `confidence_score`
+- Supported document types: bill, bank_statement, medical, insurance, tax, invoice, receipt, legal, correspondence, report, other
+- `suggested_name` format: `YYYY-MM-DD_Company_DocumentType` (no extension)
+- `extracted_metadata` includes: company, date, amount, account_number, summary
+- Task updates `Document.ai_generated_name`, `Document.document_type`, and `Document.ai_metadata` (JSON)
+- Auto-creates `Tag` records for suggested tags (default color `#6B7280`) and associates them with the document
+- `ValueError` from provider (missing config/key) marks job as failed without retrying; other exceptions trigger normal retry logic
+- Result data in ProcessingJob includes: `document_id`, `suggested_name`, `document_type`, `suggested_tags`, `extracted_metadata`, `confidence_score`
+- OpenAI uses `response_format={"type": "json_object"}` for structured output; Anthropic relies on prompt instructions
+- Document text is truncated to `AI_MAX_TEXT_LENGTH` characters before sending to the AI
 
 ### Migrations
 - Use Alembic for all schema changes: `alembic revision -m "description"` then fill in upgrade/downgrade
