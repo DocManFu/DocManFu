@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.deps import get_db
 from app.models.document import Document
+from app.models.processing_job import JobType, ProcessingJob
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class UploadResponse(BaseModel):
     original_name: str
     file_size: int
     upload_date: datetime
+    job_id: UUID | None
     message: str
 
 
@@ -75,11 +77,26 @@ async def upload_document(file: UploadFile, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(doc)
 
+    # Create OCR processing job and dispatch to Celery
+    job = ProcessingJob(document_id=doc.id, job_type=JobType.ocr)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    from app.tasks.ocr import process_ocr
+
+    task = process_ocr.delay(str(job.id), str(doc.id))
+    job.celery_task_id = task.id
+    db.commit()
+
+    logger.info("Dispatched OCR job %s (celery task %s) for document %s", job.id, task.id, doc.id)
+
     return UploadResponse(
         id=doc.id,
         filename=doc.filename,
         original_name=doc.original_name,
         file_size=doc.file_size,
         upload_date=doc.upload_date,
+        job_id=job.id,
         message="Document uploaded successfully",
     )

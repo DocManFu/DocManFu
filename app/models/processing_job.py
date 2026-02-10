@@ -3,8 +3,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDMixin
@@ -44,6 +44,10 @@ class ProcessingJob(UUIDMixin, Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    celery_task_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+    result_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     document: Mapped["Document"] = relationship(back_populates="processing_jobs")
 

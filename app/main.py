@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.documents import router as documents_router
 from app.api.health import router as health_router
+from app.api.jobs import router as jobs_router
 from app.core.config import settings
 
 logging.basicConfig(
@@ -40,5 +41,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(health_router)
 app.include_router(documents_router)
+app.include_router(jobs_router)
 
 logger.info("DocManFu %s starting up", settings.APP_VERSION)

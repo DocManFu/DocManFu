@@ -12,5 +12,10 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE_MB: int = 50
 
+    # Celery / Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_TASK_MAX_RETRIES: int = 3
+    CELERY_TASK_RETRY_DELAY: int = 60  # seconds
+
 
 settings = Settings()

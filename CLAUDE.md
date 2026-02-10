@@ -25,6 +25,13 @@ app/
   api/                  # FastAPI routers
     health.py           # GET /health — app + DB status check
     documents.py        # POST /api/documents/upload — PDF file upload
+    jobs.py             # GET /api/jobs/{job_id}/status — job progress tracking
+  tasks/                # Celery background tasks
+    base.py             # DocManFuTask base class with DB job tracking
+    ocr.py              # OCR processing task (stub — Session 5)
+    ai_analysis.py      # AI analysis task (stub — Session 6)
+    file_organization.py # File org task (stub — future session)
+  core/celery_app.py    # Celery app instance and configuration
 alembic/                # Migrations
   versions/             # Migration scripts
 uploads/                # Uploaded files stored as {YYYY}/{MM}/{DD}/{uuid}.pdf
@@ -50,6 +57,9 @@ scripts/
 - `LOG_LEVEL` controls Python logging verbosity (default: `INFO`)
 - `UPLOAD_DIR` is the base directory for uploaded files (default: `uploads/`)
 - `MAX_FILE_SIZE_MB` is the maximum upload file size in megabytes (default: `50`)
+- `REDIS_URL` is the Redis connection string for Celery broker/backend (default: `redis://localhost:6379/0`)
+- `CELERY_TASK_MAX_RETRIES` is the max retry count for failed tasks (default: `3`)
+- `CELERY_TASK_RETRY_DELAY` is the delay in seconds between retries (default: `60`)
 
 ### FastAPI & API
 - App entry point is `app/main.py` — run with `uvicorn app.main:app --reload`
@@ -58,7 +68,19 @@ scripts/
 - DB sessions in routes use `Depends(get_db)` from `app/db/deps.py`
 - New routers go in `app/api/` and are included via `app.include_router()` in `main.py`
 - Swagger UI auto-generated at `/docs`, ReDoc at `/redoc`
-- **POST /api/documents/upload** — accepts PDF `UploadFile`, validates extension + MIME type, stores in `{UPLOAD_DIR}/YYYY/MM/DD/{uuid}.pdf`, creates `Document` DB record. Returns 400 for non-PDF, 413 for oversized files.
+- **POST /api/documents/upload** — accepts PDF `UploadFile`, validates extension + MIME type, stores in `{UPLOAD_DIR}/YYYY/MM/DD/{uuid}.pdf`, creates `Document` DB record, creates OCR `ProcessingJob`, and dispatches Celery task. Returns 400 for non-PDF, 413 for oversized files. Response includes `job_id` for tracking.
+- **GET /api/jobs/{job_id}/status** — returns job status, progress (0-100), error_message, and result_data
+
+### Background Tasks (Celery)
+- Celery app defined in `app/core/celery_app.py` with Redis as broker and backend
+- All tasks inherit from `DocManFuTask` (in `app/tasks/base.py`) which provides DB job tracking
+- Tasks auto-discover from `app/tasks/` package
+- Each task receives `job_id` and `document_id` as string UUIDs
+- `DocManFuTask` provides: `mark_job_started()`, `update_job_progress()`, `mark_job_completed()`, `mark_job_failed()`
+- Failed tasks auto-retry up to `CELERY_TASK_MAX_RETRIES` times with `CELERY_TASK_RETRY_DELAY` seconds between attempts
+- On final failure, `on_failure` callback marks the ProcessingJob as failed with the error message
+- ProcessingJob has `celery_task_id` (links to Celery) and `result_data` (JSON for task output)
+- Document upload auto-dispatches OCR task; AI analysis and file organization are chained later
 
 ### Migrations
 - Use Alembic for all schema changes: `alembic revision -m "description"` then fill in upgrade/downgrade
@@ -74,6 +96,7 @@ scripts/
 source venv/bin/activate              # Activate venv
 pip install -r requirements.txt       # Install deps
 uvicorn app.main:app --reload         # Run dev server (http://localhost:8000)
+celery -A app.core.celery_app:celery_app worker --loglevel=info  # Run Celery worker
 alembic upgrade head                  # Run migrations
 alembic revision -m "description"     # Create new migration
 python scripts/seed_data.py           # Load sample data
