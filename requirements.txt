@@ -8,3 +8,5 @@ uvicorn[standard]>=0.32,<1.0
 python-multipart>=0.0.9,<1.0
 celery[redis]>=5.4,<6.0
 redis>=5.0,<6.0
+ocrmypdf>=16.0,<17.0
+pdfminer.six>=20231228,<20260000

@@ -28,7 +28,7 @@ app/
     jobs.py             # GET /api/jobs/{job_id}/status — job progress tracking
   tasks/                # Celery background tasks
     base.py             # DocManFuTask base class with DB job tracking
-    ocr.py              # OCR processing task (stub — Session 5)
+    ocr.py              # OCR processing task (ocrmypdf + pdfminer text extraction)
     ai_analysis.py      # AI analysis task (stub — Session 6)
     file_organization.py # File org task (stub — future session)
   core/celery_app.py    # Celery app instance and configuration
@@ -60,6 +60,10 @@ scripts/
 - `REDIS_URL` is the Redis connection string for Celery broker/backend (default: `redis://localhost:6379/0`)
 - `CELERY_TASK_MAX_RETRIES` is the max retry count for failed tasks (default: `3`)
 - `CELERY_TASK_RETRY_DELAY` is the delay in seconds between retries (default: `60`)
+- `OCR_LANGUAGE` is the Tesseract language code(s), use `+` to combine (default: `eng`, e.g. `eng+fra`)
+- `OCR_DPI` is the resolution for rasterizing image-only pages during OCR (default: `300`)
+- `OCR_SKIP_TEXT` skips OCR on pages that already contain text (default: `true`)
+- `OCR_CLEAN` removes intermediate files after OCR processing (default: `true`)
 
 ### FastAPI & API
 - App entry point is `app/main.py` — run with `uvicorn app.main:app --reload`
@@ -81,6 +85,19 @@ scripts/
 - On final failure, `on_failure` callback marks the ProcessingJob as failed with the error message
 - ProcessingJob has `celery_task_id` (links to Celery) and `result_data` (JSON for task output)
 - Document upload auto-dispatches OCR task; AI analysis and file organization are chained later
+
+### OCR Pipeline (`app/tasks/ocr.py`)
+- Uses `ocrmypdf` (Python library) for OCR processing and `pdfminer.six` for text extraction
+- **System deps required**: `tesseract` and `ghostscript` must be on PATH
+- Pipeline: validate file → run ocrmypdf → extract text with pdfminer → replace original PDF with searchable version → update `Document.content_text` and `processed_date`
+- OCR output goes to a temp file in the same directory, then atomically replaces the original on success
+- Handles `PriorOcrFoundError` (already OCR'd), `EncryptedPdfError`, and `InputFileError` gracefully — marks job as failed with descriptive message instead of retrying
+- `ocrmypdf.ocr()` `language` param takes a list of strings; the `OCR_LANGUAGE` config is split on `+` before passing
+- `skip_text=True` means pages with existing text layers are passed through without re-OCR
+- Text extraction uses `pdfminer.high_level.extract_text()` — falls back to empty string on failure
+- Page count uses `pdfminer.pdfpage.PDFPage.get_pages()`
+- Result data includes: `document_id`, `pages_processed`, `text_length`, `text_extracted` (bool)
+- **Note**: `ocrmypdf.ocr()` holds a global threading lock — only one OCR task runs per Python process. Scale with multiple Celery worker processes, not threads
 
 ### Migrations
 - Use Alembic for all schema changes: `alembic revision -m "description"` then fill in upgrade/downgrade

@@ -17,5 +17,11 @@ class Settings(BaseSettings):
     CELERY_TASK_MAX_RETRIES: int = 3
     CELERY_TASK_RETRY_DELAY: int = 60  # seconds
 
+    # OCR
+    OCR_LANGUAGE: str = "eng"  # Tesseract language code(s), e.g. "eng+fra"
+    OCR_DPI: int = 300  # Resolution for rasterizing pages during OCR
+    OCR_SKIP_TEXT: bool = True  # Skip pages that already contain text
+    OCR_CLEAN: bool = True  # Clean intermediate files after OCR
+
 
 settings = Settings()
