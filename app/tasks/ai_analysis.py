@@ -48,8 +48,9 @@ def process_ai_analysis(self, job_id: str, document_id: str):
         # --- Phase 2: Text-first analysis, vision fallback for poor text (50%) ---
         self.update_job_progress(job_id, 20, JobStatus.processing)
 
-        from app.core.ai_provider import analyze_document, analyze_document_vision
+        from app.core.ai_provider import _load_ai_config, analyze_document, analyze_document_vision
 
+        ai_config = _load_ai_config()
         result = None
         vision_used = False
 
@@ -60,7 +61,7 @@ def process_ai_analysis(self, job_id: str, document_id: str):
                 document.original_name, len(text),
             )
             try:
-                result = analyze_document(text, document.original_name)
+                result = analyze_document(text, document.original_name, config=ai_config)
             except ValueError as exc:
                 self.mark_job_failed(job_id, str(exc))
                 return
@@ -73,11 +74,31 @@ def process_ai_analysis(self, job_id: str, document_id: str):
                 document.original_name,
             )
             try:
-                from app.core.pdf_renderer import render_pdf_pages
+                if document.mime_type.startswith("image/"):
+                    # Image file: encode directly as base64 PNG
+                    import base64
+                    import io
 
-                images = render_pdf_pages(str(pdf_path))
+                    from PIL import Image
+
+                    img = Image.open(str(pdf_path))
+                    buf = io.BytesIO()
+                    img.save(buf, format="PNG")
+                    buf.seek(0)
+                    b64 = base64.b64encode(buf.read()).decode("utf-8")
+                    images = [b64]
+                else:
+                    # PDF file: render pages to images
+                    from app.core.pdf_renderer import render_pdf_pages
+
+                    images = render_pdf_pages(
+                        str(pdf_path),
+                        max_pages=int(ai_config.get("ai_max_pages") or 5),
+                        dpi=int(ai_config.get("ai_vision_dpi") or 150),
+                    )
+
                 if images:
-                    result = analyze_document_vision(images, document.original_name)
+                    result = analyze_document_vision(images, document.original_name, config=ai_config)
                     vision_used = True
             except ValueError as exc:
                 self.mark_job_failed(job_id, str(exc))
@@ -91,7 +112,7 @@ def process_ai_analysis(self, job_id: str, document_id: str):
         if result is None:
             self.mark_job_failed(
                 job_id,
-                "No analysis possible — no text content and PDF vision failed",
+                "No analysis possible — no text content and vision analysis failed",
             )
             return
 
@@ -131,14 +152,15 @@ def process_ai_analysis(self, job_id: str, document_id: str):
         # --- Phase 4: Create/associate suggested tags (90%) ---
         self.update_job_progress(job_id, 80, JobStatus.processing)
 
+        doc_user_id = document.user_id
         for tag_name in result.suggested_tags:
             tag_name = tag_name.strip().lower()[:100]
             if not tag_name:
                 continue
-            # Find existing tag or create new one
-            tag = db.query(Tag).filter(Tag.name == tag_name).first()
+            # Find existing tag or create new one (scoped to document owner)
+            tag = db.query(Tag).filter(Tag.name == tag_name, Tag.user_id == doc_user_id).first()
             if tag is None:
-                tag = Tag(name=tag_name, color="#6B7280")
+                tag = Tag(name=tag_name, color="#6B7280", user_id=doc_user_id)
                 db.add(tag)
                 db.flush()
                 logger.info("Created new tag: %s", tag_name)
@@ -146,6 +168,17 @@ def process_ai_analysis(self, job_id: str, document_id: str):
                 document.tags.append(tag)
 
         db.commit()
+
+        from app.core.events import publish_event
+
+        changes = ["ai_generated_name", "document_type", "ai_metadata", "tags"]
+        if result.document_type in ("bill", "invoice"):
+            changes.append("bill_status")
+        publish_event("document.updated", {
+            "document_id": document_id,
+            "changes": changes,
+            "user_id": str(doc_user_id) if doc_user_id else None,
+        })
 
         # Update search vector
         from app.core.search import update_search_vector

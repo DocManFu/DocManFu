@@ -27,7 +27,8 @@
 		other: 'i-lucide-file'
 	};
 
-	let typeIcon = $derived(typeIcons[doc.document_type ?? ''] ?? 'i-lucide-file');
+	let isImage = $derived(doc.mime_type?.startsWith('image/') ?? false);
+	let typeIcon = $derived(isImage ? 'i-lucide-image' : (typeIcons[doc.document_type ?? ''] ?? 'i-lucide-file'));
 </script>
 
 <a

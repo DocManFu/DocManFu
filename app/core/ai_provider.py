@@ -34,17 +34,19 @@ Analyze the provided document text and return a JSON object with these fields:
 }
 
 Document types (pick the best fit):
-- bill: a request for payment (utility bill, phone bill, etc.)
+- bill: a request for payment — utility bills, phone bills, medical/dental/hospital bills, any statement requesting payment or showing an amount due. If a document requests payment or shows a balance due, classify it as "bill" even if the content is medical, dental, or insurance-related.
 - invoice: an itemized bill from a vendor or contractor
 - receipt: proof of payment already made
 - bank_statement: bank or credit card account statement
-- insurance: anything from an insurance company — pre-auth approvals, EOBs, claims, coverage letters, policy documents
-- medical: medical records, lab results, prescriptions, doctor's notes (NOT insurance paperwork)
+- insurance: insurance paperwork that is NOT a bill — pre-auth approvals, EOBs, claims, coverage letters, policy documents. If the insurance document requests payment or shows a balance due, use "bill" instead.
+- medical: medical records, lab results, prescriptions, doctor's notes — NOT bills or insurance paperwork. If the medical document requests payment or shows a balance due, use "bill" instead.
 - tax: tax returns, W-2s, 1099s, tax notices
 - legal: contracts, court documents, legal notices
 - correspondence: letters, newsletters, general communications
 - report: reports, analyses, summaries
 - other: none of the above
+
+IMPORTANT: The key distinction for "bill" vs other types is whether the document requests payment or shows an amount due. A medical statement showing a balance due is a "bill", not "medical". An insurance EOB showing a patient responsibility amount is a "bill", not "insurance".
 
 Rules:
 - CRITICAL: Only use company names, dates, amounts, and other details that appear VERBATIM in the document text. NEVER guess or infer entity names that are not explicitly written in the document.
@@ -79,17 +81,19 @@ Analyze the provided page images of a document and return a JSON object with the
 }
 
 Document types (pick the best fit):
-- bill: a request for payment (utility bill, phone bill, etc.)
+- bill: a request for payment — utility bills, phone bills, medical/dental/hospital bills, any statement requesting payment or showing an amount due. If a document requests payment or shows a balance due, classify it as "bill" even if the content is medical, dental, or insurance-related.
 - invoice: an itemized bill from a vendor or contractor
 - receipt: proof of payment already made
 - bank_statement: bank or credit card account statement
-- insurance: anything from an insurance company — pre-auth approvals, EOBs, claims, coverage letters, policy documents
-- medical: medical records, lab results, prescriptions, doctor's notes (NOT insurance paperwork)
+- insurance: insurance paperwork that is NOT a bill — pre-auth approvals, EOBs, claims, coverage letters, policy documents. If the insurance document requests payment or shows a balance due, use "bill" instead.
+- medical: medical records, lab results, prescriptions, doctor's notes — NOT bills or insurance paperwork. If the medical document requests payment or shows a balance due, use "bill" instead.
 - tax: tax returns, W-2s, 1099s, tax notices
 - legal: contracts, court documents, legal notices
 - correspondence: letters, newsletters, general communications
 - report: reports, analyses, summaries
 - other: none of the above
+
+IMPORTANT: The key distinction for "bill" vs other types is whether the document requests payment or shows an amount due. A medical statement showing a balance due is a "bill", not "medical". An insurance EOB showing a patient responsibility amount is a "bill", not "insurance".
 
 Rules:
 - CRITICAL: Only use company names, dates, amounts, and other details that are VISIBLE in the document images. NEVER guess or infer entity names that do not appear in the document.
@@ -105,10 +109,10 @@ Rules:
 """
 
 
-def _build_user_message(text: str, original_filename: str) -> str:
+def _build_user_message(text: str, original_filename: str, max_text_length: int = 4000) -> str:
     """Build the user message containing document text for analysis."""
-    truncated = text[: settings.AI_MAX_TEXT_LENGTH]
-    was_truncated = len(text) > settings.AI_MAX_TEXT_LENGTH
+    truncated = text[:max_text_length]
+    was_truncated = len(text) > max_text_length
     parts = [
         f"Original filename: {original_filename}",
         "",
@@ -116,7 +120,7 @@ def _build_user_message(text: str, original_filename: str) -> str:
         truncated,
     ]
     if was_truncated:
-        parts.append(f"\n[Text truncated at {settings.AI_MAX_TEXT_LENGTH} characters out of {len(text)} total]")
+        parts.append(f"\n[Text truncated at {max_text_length} characters out of {len(text)} total]")
     return "\n".join(parts)
 
 
@@ -132,21 +136,54 @@ class AIAnalysisResult:
     confidence_score: float = 0.0
 
 
+# -- Config helper ---------------------------------------------------------
+
+
+def _load_ai_config() -> dict:
+    """Load AI config from DB settings service (with env var fallback).
+
+    Opens a short-lived DB session to read settings, then closes it.
+    """
+    try:
+        from app.db.session import SessionLocal
+        from app.core.settings_service import get_ai_config
+
+        db = SessionLocal()
+        try:
+            return get_ai_config(db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Failed to load AI config from DB, falling back to env vars: %s", exc)
+        return {
+            "ai_provider": settings.AI_PROVIDER,
+            "ai_api_key": settings.AI_API_KEY,
+            "ai_model": settings.AI_MODEL,
+            "ai_base_url": settings.AI_BASE_URL,
+            "ai_max_text_length": str(settings.AI_MAX_TEXT_LENGTH),
+            "ai_timeout": str(settings.AI_TIMEOUT),
+            "ai_max_pages": str(settings.AI_MAX_PAGES),
+            "ai_vision_dpi": str(settings.AI_VISION_DPI),
+            "ai_vision_model": settings.AI_VISION_MODEL,
+        }
+
+
 # -- Provider implementations ---------------------------------------------
 
 
-def _call_openai(text: str, original_filename: str) -> str:
+def _call_openai(text: str, original_filename: str, config: dict) -> str:
     """Call OpenAI chat completions API and return the raw response text."""
     from openai import OpenAI
 
-    client = OpenAI(api_key=settings.AI_API_KEY, timeout=settings.AI_TIMEOUT)
-    model = settings.AI_MODEL or "gpt-4o-mini"
+    client = OpenAI(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
+    model = config.get("ai_model") or "gpt-4o-mini"
+    max_text = int(config.get("ai_max_text_length") or 4000)
 
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_message(text, original_filename)},
+            {"role": "user", "content": _build_user_message(text, original_filename, max_text)},
         ],
         temperature=0.2,
         response_format={"type": "json_object"},
@@ -154,38 +191,41 @@ def _call_openai(text: str, original_filename: str) -> str:
     return response.choices[0].message.content
 
 
-def _call_anthropic(text: str, original_filename: str) -> str:
+def _call_anthropic(text: str, original_filename: str, config: dict) -> str:
     """Call Anthropic messages API and return the raw response text."""
     from anthropic import Anthropic
 
-    client = Anthropic(api_key=settings.AI_API_KEY, timeout=settings.AI_TIMEOUT)
-    model = settings.AI_MODEL or "claude-sonnet-4-5-20250929"
+    client = Anthropic(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
+    model = config.get("ai_model") or "claude-sonnet-4-5-20250929"
+    max_text = int(config.get("ai_max_text_length") or 4000)
 
     response = client.messages.create(
         model=model,
         max_tokens=1024,
         system=SYSTEM_PROMPT,
         messages=[
-            {"role": "user", "content": _build_user_message(text, original_filename)},
+            {"role": "user", "content": _build_user_message(text, original_filename, max_text)},
         ],
         temperature=0.2,
     )
     return response.content[0].text
 
 
-def _call_ollama(text: str, original_filename: str) -> str:
+def _call_ollama(text: str, original_filename: str, config: dict) -> str:
     """Call Ollama via its OpenAI-compatible API and return the raw response text."""
     from openai import OpenAI
 
-    base_url = settings.AI_BASE_URL.rstrip("/") + "/v1" if settings.AI_BASE_URL else "http://localhost:11434/v1"
-    client = OpenAI(api_key="ollama", base_url=base_url, timeout=settings.AI_TIMEOUT)
-    model = settings.AI_MODEL or "llama3.2"
+    raw_base = config.get("ai_base_url") or ""
+    base_url = raw_base.rstrip("/") + "/v1" if raw_base else "http://localhost:11434/v1"
+    client = OpenAI(api_key="ollama", base_url=base_url, timeout=int(config.get("ai_timeout") or 60))
+    model = config.get("ai_model") or "llama3.2"
+    max_text = int(config.get("ai_max_text_length") or 4000)
 
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_message(text, original_filename)},
+            {"role": "user", "content": _build_user_message(text, original_filename, max_text)},
         ],
         temperature=0.2,
         response_format={"type": "json_object"},
@@ -203,12 +243,12 @@ _PROVIDERS = {
 # -- Vision provider implementations --------------------------------------
 
 
-def _call_openai_vision(images: list[str], original_filename: str) -> str:
+def _call_openai_vision(images: list[str], original_filename: str, config: dict) -> str:
     """Call OpenAI with vision content blocks."""
     from openai import OpenAI
 
-    client = OpenAI(api_key=settings.AI_API_KEY, timeout=settings.AI_TIMEOUT)
-    model = settings.AI_VISION_MODEL or settings.AI_MODEL or "gpt-4o"
+    client = OpenAI(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
+    model = config.get("ai_vision_model") or config.get("ai_model") or "gpt-4o"
 
     content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
     for img_b64 in images:
@@ -229,12 +269,12 @@ def _call_openai_vision(images: list[str], original_filename: str) -> str:
     return response.choices[0].message.content
 
 
-def _call_anthropic_vision(images: list[str], original_filename: str) -> str:
+def _call_anthropic_vision(images: list[str], original_filename: str, config: dict) -> str:
     """Call Anthropic with image content blocks."""
     from anthropic import Anthropic
 
-    client = Anthropic(api_key=settings.AI_API_KEY, timeout=settings.AI_TIMEOUT)
-    model = settings.AI_VISION_MODEL or settings.AI_MODEL or "claude-sonnet-4-5-20250929"
+    client = Anthropic(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
+    model = config.get("ai_vision_model") or config.get("ai_model") or "claude-sonnet-4-5-20250929"
 
     content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
     for img_b64 in images:
@@ -253,13 +293,14 @@ def _call_anthropic_vision(images: list[str], original_filename: str) -> str:
     return response.content[0].text
 
 
-def _call_ollama_vision(images: list[str], original_filename: str) -> str:
+def _call_ollama_vision(images: list[str], original_filename: str, config: dict) -> str:
     """Call Ollama vision model via OpenAI-compatible API."""
     from openai import OpenAI
 
-    base_url = settings.AI_BASE_URL.rstrip("/") + "/v1" if settings.AI_BASE_URL else "http://localhost:11434/v1"
-    client = OpenAI(api_key="ollama", base_url=base_url, timeout=settings.AI_TIMEOUT)
-    model = settings.AI_VISION_MODEL or settings.AI_MODEL or "granite3.2-vision"
+    raw_base = config.get("ai_base_url") or ""
+    base_url = raw_base.rstrip("/") + "/v1" if raw_base else "http://localhost:11434/v1"
+    client = OpenAI(api_key="ollama", base_url=base_url, timeout=int(config.get("ai_timeout") or 60))
+    model = config.get("ai_vision_model") or config.get("ai_model") or "granite3.2-vision"
 
     content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
     for img_b64 in images:
@@ -353,12 +394,13 @@ def _parse_response(raw: str) -> AIAnalysisResult:
 # -- Public API ------------------------------------------------------------
 
 
-def analyze_document(text: str, original_filename: str) -> AIAnalysisResult:
+def analyze_document(text: str, original_filename: str, config: dict | None = None) -> AIAnalysisResult:
     """Analyze document text using the configured AI provider.
 
     Args:
         text: Extracted document text (from OCR).
         original_filename: The original uploaded filename.
+        config: Optional AI config dict. If not provided, loads from DB/env.
 
     Returns:
         AIAnalysisResult with classification, naming, and metadata.
@@ -367,22 +409,25 @@ def analyze_document(text: str, original_filename: str) -> AIAnalysisResult:
         ValueError: If AI_PROVIDER is "none" or not configured.
         RuntimeError: If the AI call or response parsing fails.
     """
-    provider = settings.AI_PROVIDER.lower()
+    if config is None:
+        config = _load_ai_config()
+
+    provider = (config.get("ai_provider") or "none").lower()
 
     if provider == "none" or not provider:
         raise ValueError("AI_PROVIDER is set to 'none' — AI analysis is disabled")
 
-    if provider != "ollama" and not settings.AI_API_KEY:
+    if provider != "ollama" and not config.get("ai_api_key"):
         raise ValueError(f"AI_API_KEY is not set for provider '{provider}'")
 
     call_fn = _PROVIDERS.get(provider)
     if call_fn is None:
         raise ValueError(f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_PROVIDERS)}")
 
-    model = settings.AI_MODEL or "(default)"
+    model = config.get("ai_model") or "(default)"
     logger.info("Calling AI provider '%s' (model: %s) for '%s'", provider, model, original_filename)
 
-    raw_response = call_fn(text, original_filename)
+    raw_response = call_fn(text, original_filename, config)
     logger.debug("Raw AI response: %s", raw_response[:500])
 
     result = _parse_response(raw_response)
@@ -395,12 +440,13 @@ def analyze_document(text: str, original_filename: str) -> AIAnalysisResult:
     return result
 
 
-def analyze_document_vision(images: list[str], original_filename: str) -> AIAnalysisResult:
+def analyze_document_vision(images: list[str], original_filename: str, config: dict | None = None) -> AIAnalysisResult:
     """Analyze document page images using the configured AI provider's vision model.
 
     Args:
         images: List of base64-encoded PNG strings (one per page).
         original_filename: The original uploaded filename.
+        config: Optional AI config dict. If not provided, loads from DB/env.
 
     Returns:
         AIAnalysisResult with classification, naming, and metadata.
@@ -409,25 +455,28 @@ def analyze_document_vision(images: list[str], original_filename: str) -> AIAnal
         ValueError: If AI_PROVIDER is "none" or not configured.
         RuntimeError: If the AI call or response parsing fails.
     """
-    provider = settings.AI_PROVIDER.lower()
+    if config is None:
+        config = _load_ai_config()
+
+    provider = (config.get("ai_provider") or "none").lower()
 
     if provider == "none" or not provider:
         raise ValueError("AI_PROVIDER is set to 'none' — AI analysis is disabled")
 
-    if provider != "ollama" and not settings.AI_API_KEY:
+    if provider != "ollama" and not config.get("ai_api_key"):
         raise ValueError(f"AI_API_KEY is not set for provider '{provider}'")
 
     call_fn = _VISION_PROVIDERS.get(provider)
     if call_fn is None:
         raise ValueError(f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_VISION_PROVIDERS)}")
 
-    vision_model = settings.AI_VISION_MODEL or settings.AI_MODEL or "(default)"
+    vision_model = config.get("ai_vision_model") or config.get("ai_model") or "(default)"
     logger.info(
         "Calling AI provider '%s' vision (model: %s) for '%s' (%d pages)",
         provider, vision_model, original_filename, len(images),
     )
 
-    raw_response = call_fn(images, original_filename)
+    raw_response = call_fn(images, original_filename, config)
     logger.debug("Raw AI vision response: %s", raw_response[:500])
 
     result = _parse_response(raw_response)

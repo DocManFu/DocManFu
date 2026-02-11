@@ -34,5 +34,11 @@ class Settings(BaseSettings):
     AI_VISION_DPI: int = 150  # Render resolution for vision analysis
     AI_VISION_MODEL: str = ""  # Vision model override (empty = use AI_MODEL)
 
+    # JWT Authentication
+    JWT_SECRET_KEY: str = ""
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
 
 settings = Settings()

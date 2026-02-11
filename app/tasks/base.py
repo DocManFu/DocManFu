@@ -7,6 +7,7 @@ from celery import Task
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.models.document import Document
 from app.models.processing_job import JobStatus, ProcessingJob
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,13 @@ class DocManFuTask(Task):
         """Return a new DB session (caller must close)."""
         return SessionLocal()
 
+    def _get_doc_user_id(self, db, document_id) -> str | None:
+        """Look up the user_id for a document (for event filtering)."""
+        doc = db.get(Document, document_id)
+        if doc and doc.user_id:
+            return str(doc.user_id)
+        return None
+
     def update_job_progress(self, job_id: str, progress: int, status: JobStatus | None = None):
         """Persist progress (0-100) and optional status change."""
         db = self._get_db()
@@ -45,6 +53,18 @@ class DocManFuTask(Task):
             if status == JobStatus.processing and job.started_at is None:
                 job.started_at = datetime.now(timezone.utc)
             db.commit()
+
+            from app.core.events import publish_event
+
+            user_id = self._get_doc_user_id(db, job.document_id)
+            publish_event("job.progress", {
+                "job_id": job_id,
+                "document_id": str(job.document_id),
+                "job_type": job.job_type.value,
+                "status": (status or job.status).value,
+                "progress": min(progress, 100),
+                "user_id": user_id,
+            })
         finally:
             db.close()
 
@@ -59,6 +79,18 @@ class DocManFuTask(Task):
             job.started_at = datetime.now(timezone.utc)
             job.progress = 0
             db.commit()
+
+            from app.core.events import publish_event
+
+            user_id = self._get_doc_user_id(db, job.document_id)
+            publish_event("job.started", {
+                "job_id": job_id,
+                "document_id": str(job.document_id),
+                "job_type": job.job_type.value,
+                "status": "processing",
+                "progress": 0,
+                "user_id": user_id,
+            })
         finally:
             db.close()
 
@@ -75,6 +107,19 @@ class DocManFuTask(Task):
             if result_data is not None:
                 job.result_data = result_data
             db.commit()
+
+            from app.core.events import publish_event
+
+            user_id = self._get_doc_user_id(db, job.document_id)
+            publish_event("job.completed", {
+                "job_id": job_id,
+                "document_id": str(job.document_id),
+                "job_type": job.job_type.value,
+                "status": "completed",
+                "progress": 100,
+                "result_data": result_data,
+                "user_id": user_id,
+            })
         finally:
             db.close()
 
@@ -89,6 +134,19 @@ class DocManFuTask(Task):
             job.error_message = error_message
             job.completed_at = datetime.now(timezone.utc)
             db.commit()
+
+            from app.core.events import publish_event
+
+            user_id = self._get_doc_user_id(db, job.document_id)
+            publish_event("job.failed", {
+                "job_id": job_id,
+                "document_id": str(job.document_id),
+                "job_type": job.job_type.value,
+                "status": "failed",
+                "progress": job.progress,
+                "error_message": error_message,
+                "user_id": user_id,
+            })
         finally:
             db.close()
 

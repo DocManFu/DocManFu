@@ -29,6 +29,7 @@ ENV/
 .env
 .env.local
 .env.production
+.env.deploy
 
 # Database
 *.db
@@ -59,6 +60,9 @@ logs/
 uploads/
 processed/
 temp/
+
+# Backups
+backups/
 
 # Redis dump
 dump.rdb

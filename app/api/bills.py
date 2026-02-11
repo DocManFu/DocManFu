@@ -9,8 +9,10 @@ from pydantic import BaseModel
 from sqlalchemy import nulls_last
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user, require_write_access
 from app.db.deps import get_db
 from app.models.document import Document
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +62,16 @@ def list_bills(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """List bills filtered by status, sorted by due date (nulls last)."""
     query = db.query(Document).filter(
         Document.deleted_at.is_(None),
         Document.bill_status.isnot(None),
     )
+
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
 
     if status != "all":
         query = query.filter(Document.bill_status == status)
@@ -86,16 +92,16 @@ def update_bill_status(
     bill_id: UUID,
     body: BillStatusUpdate,
     db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
 ):
     """Set bill status to paid, dismissed, or unpaid."""
     if body.status not in ("paid", "dismissed", "unpaid"):
         raise HTTPException(status_code=400, detail="Status must be 'paid', 'dismissed', or 'unpaid'")
 
-    doc = (
-        db.query(Document)
-        .filter(Document.id == bill_id, Document.deleted_at.is_(None))
-        .first()
-    )
+    query = db.query(Document).filter(Document.id == bill_id, Document.deleted_at.is_(None))
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
+    doc = query.first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -116,13 +122,13 @@ def update_bill_due_date(
     bill_id: UUID,
     body: BillDueDateUpdate,
     db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
 ):
     """Manually set or clear the due date for a bill."""
-    doc = (
-        db.query(Document)
-        .filter(Document.id == bill_id, Document.deleted_at.is_(None))
-        .first()
-    )
+    query = db.query(Document).filter(Document.id == bill_id, Document.deleted_at.is_(None))
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
+    doc = query.first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 

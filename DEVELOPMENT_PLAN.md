@@ -356,26 +356,24 @@ When you're done, update CLAUDE.md with information that will be useful for you 
 Create production deployment configuration:
 - Multi-stage Dockerfiles (backend, frontend, workers)
 - docker-compose.yml with all services
-- nginx reverse proxy configuration
 - Environment-based configuration
 - Health checks for all services
 - Log aggregation setup
 - Database backup scripts
-- SSL certificate setup (Let's Encrypt)
 
 Services needed:
 - FastAPI backend
 - Celery workers
 - Redis broker
 - PostgreSQL database
-- Svelte frontend (nginx)
-- nginx reverse proxy
 
 Include documentation for:
 - Initial setup
 - Environment configuration
 - Backup/restore procedures
 - Scaling workers
+
+Note: I personally will run this on my nas with other services. I will use my existing Caddy set up for reverse proxy. Can you include documentation on how to configure Caddy and nginx?
 ```
 
 **Deliverable:** Complete deployment setup with documentation

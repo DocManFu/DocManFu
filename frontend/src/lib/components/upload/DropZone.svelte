@@ -8,14 +8,27 @@
 	let dragging = $state(false);
 	let fileInput: HTMLInputElement;
 
+	const allowedMimeTypes = new Set([
+		'application/pdf',
+		'image/jpeg',
+		'image/png',
+		'image/tiff',
+		'image/webp'
+	]);
+	const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp']);
+
+	function isAllowedFile(f: File): boolean {
+		if (allowedMimeTypes.has(f.type)) return true;
+		const ext = f.name.toLowerCase().slice(f.name.lastIndexOf('.'));
+		return allowedExtensions.has(ext);
+	}
+
 	function handleDrop(e: DragEvent) {
 		e.preventDefault();
 		dragging = false;
 		if (disabled || !e.dataTransfer) return;
 
-		const files = Array.from(e.dataTransfer.files).filter(
-			(f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
-		);
+		const files = Array.from(e.dataTransfer.files).filter(isAllowedFile);
 		if (files.length > 0) onfiles(files);
 	}
 
@@ -53,14 +66,14 @@
 >
 	<span class="i-lucide-upload-cloud text-4xl {dragging ? 'text-brand-500' : 'text-gray-400'} mb-3 block mx-auto"></span>
 	<p class="text-base font-medium text-gray-700 dark:text-gray-300">
-		{dragging ? 'Drop PDF files here' : 'Drag & drop PDF files here'}
+		{dragging ? 'Drop files here' : 'Drag & drop files here'}
 	</p>
-	<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">or click to browse (max 50 MB per file)</p>
+	<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">PDF, JPEG, PNG, TIFF, or WebP (max 50 MB per file)</p>
 </div>
 
 <input
 	type="file"
-	accept=".pdf,application/pdf"
+	accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.webp,application/pdf,image/jpeg,image/png,image/tiff,image/webp"
 	multiple
 	class="hidden"
 	bind:this={fileInput}

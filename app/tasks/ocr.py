@@ -1,4 +1,4 @@
-"""OCR processing task – extracts text from PDF documents using ocrmypdf."""
+"""OCR processing task – extracts text from documents using ocrmypdf (PDFs) or pytesseract (images)."""
 
 import logging
 import tempfile
@@ -15,6 +15,11 @@ from app.models.processing_job import JobStatus, JobType, ProcessingJob
 from app.tasks.base import DocManFuTask
 
 logger = logging.getLogger(__name__)
+
+
+def _is_image(mime_type: str) -> bool:
+    """Check if the MIME type is an image format."""
+    return mime_type.startswith("image/")
 
 
 @celery_app.task(base=DocManFuTask, bind=True, name="tasks.process_ocr")
@@ -50,69 +55,19 @@ def process_ocr(self, job_id: str, document_id: str):
             return
         logger.info("Found file at %s (%d bytes)", input_path, document.file_size)
 
-        # --- Phase 2: Run ocrmypdf (50%) ---
+        # --- Phase 2+3: OCR and text extraction (branched by file type) ---
         self.update_job_progress(job_id, 20, JobStatus.processing)
 
-        # Write OCR output to a temp file, then swap on success
-        output_fd = tempfile.NamedTemporaryFile(
-            suffix=".pdf", delete=False, dir=input_path.parent
-        )
-        output_path = Path(output_fd.name)
-        output_fd.close()
-
-        try:
-            # language expects a list: "eng+fra" → ["eng", "fra"]
-            languages = settings.OCR_LANGUAGE.split("+")
-            ocrmypdf.ocr(
-                input_file=str(input_path),
-                output_file=str(output_path),
-                language=languages,
-                image_dpi=settings.OCR_DPI,
-                skip_text=settings.OCR_SKIP_TEXT,
-                clean=settings.OCR_CLEAN,
-                progress_bar=False,
-            )
-        except ocrmypdf.PriorOcrFoundError:
-            # PDF already has OCR text — use it as-is
-            logger.info("PDF already contains OCR text, skipping re-OCR")
-            output_path.unlink(missing_ok=True)
-            output_path = input_path
-        except ocrmypdf.exceptions.EncryptedPdfError:
-            output_path.unlink(missing_ok=True)
-            self.mark_job_failed(job_id, "PDF is encrypted and cannot be processed")
-            return
-        except ocrmypdf.exceptions.InputFileError as exc:
-            output_path.unlink(missing_ok=True)
-            self.mark_job_failed(job_id, f"Invalid input PDF: {exc}")
-            return
-
-        self.update_job_progress(job_id, 50, JobStatus.processing)
-        logger.info("OCR processing complete for %s", document.file_path)
-
-        # --- Phase 3: Extract text from searchable PDF (80%) ---
-        self.update_job_progress(job_id, 60, JobStatus.processing)
-
-        text_source = output_path if output_path.exists() else input_path
-        try:
-            extracted_text = extract_text(str(text_source))
-        except Exception as exc:
-            logger.warning("Text extraction failed for %s: %s", text_source, exc)
-            extracted_text = ""
-
-        # Clean up whitespace but preserve structure
-        extracted_text = extracted_text.strip()
-
-        self.update_job_progress(job_id, 80, JobStatus.processing)
-        logger.info(
-            "Extracted %d characters of text from %s",
-            len(extracted_text),
-            document.original_name,
-        )
-
-        # --- Phase 4: Replace original with searchable PDF ---
-        if output_path != input_path and output_path.exists():
-            output_path.replace(input_path)
-            logger.info("Replaced original PDF with searchable version")
+        if _is_image(document.mime_type):
+            # --- Image path: pytesseract ---
+            extracted_text, page_count = _ocr_image(self, job_id, input_path)
+            if extracted_text is None:
+                return  # job already marked as failed
+        else:
+            # --- PDF path: ocrmypdf + pdfminer ---
+            extracted_text, page_count = _ocr_pdf(self, job_id, input_path, document)
+            if extracted_text is None:
+                return  # job already marked as failed
 
         # --- Phase 5: Update document record (90%) ---
         self.update_job_progress(job_id, 90, JobStatus.processing)
@@ -125,9 +80,6 @@ def process_ocr(self, job_id: str, document_id: str):
         from app.core.search import update_search_vector
 
         update_search_vector(db, document_id)
-
-        # Count pages for result data
-        page_count = _count_pdf_pages(input_path)
 
         # --- Done ---
         result = {
@@ -153,6 +105,90 @@ def process_ocr(self, job_id: str, document_id: str):
         raise
     finally:
         db.close()
+
+
+def _ocr_image(task, job_id: str, input_path: Path) -> tuple[str | None, int]:
+    """Run OCR on an image file using pytesseract. Returns (extracted_text, page_count) or (None, 0) on failure."""
+    import pytesseract
+    from PIL import Image
+
+    try:
+        img = Image.open(input_path)
+        extracted_text = pytesseract.image_to_string(img, lang=settings.OCR_LANGUAGE)
+    except Exception as exc:
+        logger.warning("Image OCR failed for %s: %s", input_path, exc)
+        extracted_text = ""
+
+    extracted_text = extracted_text.strip()
+
+    task.update_job_progress(job_id, 80, JobStatus.processing)
+    logger.info("Extracted %d characters from image %s", len(extracted_text), input_path.name)
+
+    return extracted_text, 1
+
+
+def _ocr_pdf(task, job_id: str, input_path: Path, document) -> tuple[str | None, int]:
+    """Run OCR on a PDF file using ocrmypdf + pdfminer. Returns (extracted_text, page_count) or (None, 0) on failure."""
+    # Write OCR output to a temp file, then swap on success
+    output_fd = tempfile.NamedTemporaryFile(
+        suffix=".pdf", delete=False, dir=input_path.parent
+    )
+    output_path = Path(output_fd.name)
+    output_fd.close()
+
+    try:
+        languages = settings.OCR_LANGUAGE.split("+")
+        ocrmypdf.ocr(
+            input_file=str(input_path),
+            output_file=str(output_path),
+            language=languages,
+            image_dpi=settings.OCR_DPI,
+            skip_text=settings.OCR_SKIP_TEXT,
+            clean=settings.OCR_CLEAN,
+            progress_bar=False,
+        )
+    except ocrmypdf.PriorOcrFoundError:
+        logger.info("PDF already contains OCR text, skipping re-OCR")
+        output_path.unlink(missing_ok=True)
+        output_path = input_path
+    except ocrmypdf.exceptions.EncryptedPdfError:
+        output_path.unlink(missing_ok=True)
+        task.mark_job_failed(job_id, "PDF is encrypted and cannot be processed")
+        return None, 0
+    except ocrmypdf.exceptions.InputFileError as exc:
+        output_path.unlink(missing_ok=True)
+        task.mark_job_failed(job_id, f"Invalid input PDF: {exc}")
+        return None, 0
+
+    task.update_job_progress(job_id, 50, JobStatus.processing)
+    logger.info("OCR processing complete for %s", document.file_path)
+
+    # Extract text from searchable PDF
+    task.update_job_progress(job_id, 60, JobStatus.processing)
+
+    text_source = output_path if output_path.exists() else input_path
+    try:
+        extracted_text = extract_text(str(text_source))
+    except Exception as exc:
+        logger.warning("Text extraction failed for %s: %s", text_source, exc)
+        extracted_text = ""
+
+    extracted_text = extracted_text.strip()
+
+    task.update_job_progress(job_id, 80, JobStatus.processing)
+    logger.info(
+        "Extracted %d characters of text from %s",
+        len(extracted_text),
+        document.original_name,
+    )
+
+    # Replace original with searchable PDF
+    if output_path != input_path and output_path.exists():
+        output_path.replace(input_path)
+        logger.info("Replaced original PDF with searchable version")
+
+    page_count = _count_pdf_pages(input_path)
+    return extracted_text, page_count
 
 
 def _count_pdf_pages(pdf_path: Path) -> int:

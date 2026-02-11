@@ -8,3 +8,7 @@ export function getJobStatus(jobId: string): Promise<JobStatusResponse> {
 export function getDocumentJobs(documentId: string): Promise<JobStatusResponse[]> {
 	return apiFetch<JobStatusResponse[]>(`/api/jobs/by-document/${documentId}`);
 }
+
+export function getDocumentJobHistory(documentId: string): Promise<JobStatusResponse[]> {
+	return apiFetch<JobStatusResponse[]>(`/api/jobs/by-document/${documentId}/history`);
+}

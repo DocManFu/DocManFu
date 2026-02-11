@@ -1,0 +1,307 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_NAME="docmanfu"
+COMPOSE_FILE="docker-compose.yml"
+DEFAULT_SERVICE="api"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+info()  { echo -e "${BLUE}${BOLD}[info]${NC}  $*"; }
+ok()    { echo -e "${GREEN}${BOLD}[ok]${NC}    $*"; }
+warn()  { echo -e "${YELLOW}${BOLD}[warn]${NC}  $*"; }
+err()   { echo -e "${RED}${BOLD}[error]${NC} $*"; }
+
+PROFILES=()
+
+compose() {
+    local profile_args=()
+    for p in "${PROFILES[@]}"; do
+        profile_args+=(--profile "$p")
+    done
+    docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" "${profile_args[@]}" "$@"
+}
+
+usage() {
+    cat <<EOF
+${BOLD}DocManFu Production Environment${NC}
+
+${BOLD}Usage:${NC} ./prod <command> [options]
+
+${BOLD}Commands:${NC}
+  up, start          Start all containers (default if no command given)
+  down, stop         Stop and remove containers
+  restart            Restart all containers
+  rebuild            Full rebuild with --no-cache
+  build              Build images without starting
+  logs [service]     Follow container logs (optionally for a specific service)
+  ps, status         Show container status
+  shell [service]    Open a shell in a container (default: ${DEFAULT_SERVICE})
+  clean              Stop containers and remove volumes (with confirmation)
+  migrate            Run alembic migrations (alembic upgrade head)
+  backup [--uploads] Create a database backup (optionally include uploads)
+  restore <file>     Restore database from a backup file
+  pull-models        Pull AI models into the Ollama container
+
+${BOLD}Options:${NC}
+  -d, --detach       Run containers in the background (for up, restart, rebuild)
+  --profile <name>   Activate a compose profile (ollama, ollama-cpu)
+  -h, --help         Show this help message
+
+${BOLD}Services:${NC}
+  api                FastAPI backend
+  worker             Celery background worker
+  frontend           nginx SPA server (port \${FRONTEND_PORT:-8080})
+  db                 PostgreSQL
+  redis              Redis
+  migrate            One-shot migration runner
+  ollama             Ollama with NVIDIA GPU (--profile ollama)
+  ollama-cpu         Ollama CPU-only (--profile ollama-cpu)
+
+${BOLD}AI Setup:${NC}
+  Option 1 — Ollama in Docker with GPU (Linux + NVIDIA):
+    ./prod up -d --profile ollama
+    ./prod pull-models                  # pulls llama3.2
+
+  Option 2 — Ollama in Docker, CPU-only (slower, any OS):
+    ./prod up -d --profile ollama-cpu
+    ./prod pull-models
+
+  Option 3 — Cloud API (OpenAI / Anthropic):
+    Set AI_PROVIDER, AI_API_KEY, AI_MODEL in .env (no profile needed)
+
+  Option 4 — No AI:
+    Set AI_PROVIDER=none in .env (default)
+
+${BOLD}Examples:${NC}
+  ./prod up -d                         Start core services (no Ollama)
+  ./prod up -d --profile ollama        Start with Ollama + GPU
+  ./prod up -d --profile ollama-cpu    Start with Ollama, CPU-only
+  ./prod pull-models                   Pull default AI models into Ollama
+  ./prod logs api                      Follow API logs
+  ./prod shell worker                  Open shell in worker container
+  ./prod rebuild -d                    Rebuild and start detached
+  ./prod backup                        Create database backup
+  ./prod backup --uploads              Backup database + uploaded files
+  ./prod restore backups/docmanfu_db_20250101_020000.sql.gz
+EOF
+}
+
+cmd_up() {
+    local detach=""
+    for arg in "$@"; do
+        case "$arg" in
+            -d|--detach) detach="--detach" ;;
+            --profile) ;; # handled by global parser
+            *) ;;
+        esac
+    done
+    info "Starting ${PROJECT_NAME} services..."
+    compose up --build $detach
+    if [[ -n "$detach" ]]; then
+        ok "Services started in background"
+        compose ps
+    fi
+}
+
+cmd_down() {
+    warn "Stopping ${PROJECT_NAME} services..."
+    # Include all profiles so ollama containers get stopped too
+    docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --profile ollama --profile ollama-cpu down
+    ok "Services stopped"
+}
+
+cmd_restart() {
+    local detach=""
+    for arg in "$@"; do
+        case "$arg" in
+            -d|--detach) detach="--detach" ;;
+        esac
+    done
+    warn "Restarting ${PROJECT_NAME} services..."
+    compose down
+    compose up --build $detach
+    if [[ -n "$detach" ]]; then
+        ok "Services restarted in background"
+        compose ps
+    fi
+}
+
+cmd_rebuild() {
+    local detach=""
+    for arg in "$@"; do
+        case "$arg" in
+            -d|--detach) detach="--detach" ;;
+        esac
+    done
+    warn "Rebuilding ${PROJECT_NAME} with --no-cache..."
+    compose build --no-cache
+    compose up $detach
+    if [[ -n "$detach" ]]; then
+        ok "Services rebuilt and started in background"
+        compose ps
+    fi
+}
+
+cmd_build() {
+    info "Building ${PROJECT_NAME} images..."
+    compose build
+    ok "Build complete"
+}
+
+cmd_logs() {
+    local service="${1:-}"
+    if [[ -n "$service" ]]; then
+        info "Following logs for ${service}..."
+        compose logs -f "$service"
+    else
+        info "Following logs for all services..."
+        compose logs -f
+    fi
+}
+
+cmd_ps() {
+    compose ps
+}
+
+cmd_shell() {
+    local service="${1:-$DEFAULT_SERVICE}"
+    info "Opening shell in ${service}..."
+    compose exec "$service" sh -c 'command -v bash >/dev/null 2>&1 && exec bash || exec sh'
+}
+
+cmd_clean() {
+    echo -e "${RED}${BOLD}WARNING: This will stop all containers and delete all volumes (database data, uploads, etc.)${NC}"
+    read -r -p "Are you sure? [y/N] " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        err "Cleaning ${PROJECT_NAME}..."
+        docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --profile ollama --profile ollama-cpu down -v
+        ok "Containers stopped and volumes removed"
+    else
+        info "Cancelled"
+    fi
+}
+
+cmd_migrate() {
+    info "Running database migrations..."
+    compose exec api alembic upgrade head
+    ok "Migrations complete"
+}
+
+cmd_backup() {
+    info "Running database backup..."
+    bash "${SCRIPT_DIR}/scripts/backup.sh" "$@"
+    ok "Backup complete"
+}
+
+cmd_restore() {
+    if [[ $# -lt 1 ]]; then
+        err "Usage: ./prod restore <backup_file.sql.gz>"
+        exit 1
+    fi
+    warn "Running database restore..."
+    bash "${SCRIPT_DIR}/scripts/restore.sh" "$@"
+}
+
+cmd_pull_models() {
+    local ollama_service=""
+    # Detect which ollama service is running (check all profiles)
+    local all_running
+    all_running="$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --profile ollama --profile ollama-cpu ps --status running 2>/dev/null || true)"
+    if echo "$all_running" | grep -q "ollama-cpu"; then
+        ollama_service="ollama-cpu"
+    elif echo "$all_running" | grep -q "ollama"; then
+        ollama_service="ollama"
+    else
+        err "No Ollama service is running. Start with: ./prod up -d --profile ollama"
+        exit 1
+    fi
+    info "Pulling models into ${ollama_service}..."
+    docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --profile ollama --profile ollama-cpu \
+        exec "$ollama_service" ollama pull llama3.2
+    ok "Models pulled successfully"
+}
+
+# Parse global options (--profile) before command
+ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --profile)
+            PROFILES+=("$2")
+            shift 2
+            ;;
+        *)
+            ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+set -- "${ARGS[@]}"
+
+COMMAND="${1:-up}"
+
+case "$COMMAND" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    up|start)
+        shift || true
+        cmd_up "$@"
+        ;;
+    down|stop)
+        cmd_down
+        ;;
+    restart)
+        shift
+        cmd_restart "$@"
+        ;;
+    rebuild)
+        shift
+        cmd_rebuild "$@"
+        ;;
+    build)
+        cmd_build
+        ;;
+    logs)
+        shift
+        cmd_logs "$@"
+        ;;
+    ps|status)
+        cmd_ps
+        ;;
+    shell)
+        shift
+        cmd_shell "$@"
+        ;;
+    clean)
+        cmd_clean
+        ;;
+    migrate)
+        cmd_migrate
+        ;;
+    backup)
+        shift
+        cmd_backup "$@"
+        ;;
+    restore)
+        shift
+        cmd_restore "$@"
+        ;;
+    pull-models)
+        cmd_pull_models
+        ;;
+    *)
+        err "Unknown command: ${COMMAND}"
+        echo
+        usage
+        exit 1
+        ;;
+esac

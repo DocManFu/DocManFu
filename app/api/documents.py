@@ -13,16 +13,29 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.auth import get_current_user, require_write_access
 from app.core.config import settings
 from app.core.search import update_search_vector
 from app.db.deps import get_db
 from app.models.document import Document
 from app.models.processing_job import JobType, ProcessingJob
 from app.models.tag import Tag
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
+
+# Allowed upload file types: extension → MIME type
+ALLOWED_UPLOAD_TYPES: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".webp": "image/webp",
+}
 
 
 # --- Response Models ---
@@ -42,6 +55,7 @@ class DocumentListItem(BaseModel):
     original_name: str
     ai_generated_name: str | None
     document_type: str | None
+    mime_type: str
     file_size: int
     upload_date: datetime
     processed_date: datetime | None
@@ -89,6 +103,7 @@ class SearchResultItem(BaseModel):
     original_name: str
     ai_generated_name: str | None
     document_type: str | None
+    mime_type: str
     file_size: int
     upload_date: datetime
     processed_date: datetime | None
@@ -146,12 +161,11 @@ class BulkReprocessRequest(BaseModel):
 # --- Helpers ---
 
 
-def _get_document_or_404(db: Session, document_id: UUID) -> Document:
-    doc = (
-        db.query(Document)
-        .filter(Document.id == document_id, Document.deleted_at.is_(None))
-        .first()
-    )
+def _get_document_or_404(db: Session, document_id: UUID, user: User) -> Document:
+    query = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None))
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
+    doc = query.first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
@@ -169,6 +183,7 @@ def search_documents(
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """Full-text search using PostgreSQL tsvector with ranking and highlights."""
     ts_query = func.plainto_tsquery("english", q)
@@ -188,6 +203,9 @@ def search_documents(
         .filter(Document.deleted_at.is_(None))
         .filter(Document.search_vector.op("@@")(ts_query))
     )
+
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
 
     if document_type:
         query = query.filter(Document.document_type == document_type)
@@ -216,15 +234,22 @@ def search_documents(
 
 
 @router.post("/upload", response_model=UploadResponse, status_code=200)
-async def upload_document(file: UploadFile, db: Session = Depends(get_db)):
+async def upload_document(
+    file: UploadFile,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     # Validate extension
     original_name = file.filename or "unknown.pdf"
-    if not original_name.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    ext = Path(original_name).suffix.lower()
+    if ext not in ALLOWED_UPLOAD_TYPES:
+        allowed = ", ".join(sorted(ALLOWED_UPLOAD_TYPES.keys()))
+        raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {allowed}")
 
-    # Validate MIME type
-    if file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    # Validate MIME type (accept application/octet-stream as fallback for valid extensions)
+    expected_mime = ALLOWED_UPLOAD_TYPES[ext]
+    if file.content_type not in (expected_mime, "application/octet-stream"):
+        raise HTTPException(status_code=400, detail=f"Invalid MIME type for {ext} file")
 
     # Read file content and check size
     content = await file.read()
@@ -235,10 +260,10 @@ async def upload_document(file: UploadFile, db: Session = Depends(get_db)):
             detail=f"File too large. Maximum size is {settings.MAX_FILE_SIZE_MB} MB",
         )
 
-    # Build storage path: {UPLOAD_DIR}/YYYY/MM/DD/{uuid4}.pdf
+    # Build storage path: {UPLOAD_DIR}/YYYY/MM/DD/{uuid4}{ext}
     now = datetime.now(timezone.utc)
     file_uuid = uuid.uuid4()
-    generated_filename = f"{file_uuid}.pdf"
+    generated_filename = f"{file_uuid}{ext}"
     relative_dir = Path(now.strftime("%Y/%m/%d"))
     relative_path = relative_dir / generated_filename
 
@@ -256,9 +281,10 @@ async def upload_document(file: UploadFile, db: Session = Depends(get_db)):
         filename=generated_filename,
         original_name=original_name,
         file_path=str(relative_path),
-        mime_type="application/pdf",
+        mime_type=expected_mime,
         file_size=len(content),
         upload_date=now,
+        user_id=user.id,
     )
     db.add(doc)
     db.commit()
@@ -302,9 +328,13 @@ def list_documents(
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """List documents with filtering, sorting, and pagination."""
     query = db.query(Document).filter(Document.deleted_at.is_(None))
+
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
 
     if document_type:
         query = query.filter(Document.document_type == document_type)
@@ -341,21 +371,27 @@ def list_documents(
 
 
 @router.post("/bulk/tag", status_code=200)
-def bulk_tag_documents(req: BulkTagRequest, db: Session = Depends(get_db)):
+def bulk_tag_documents(
+    req: BulkTagRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Add or remove tags on multiple documents."""
-    docs = (
+    query = (
         db.query(Document)
         .options(selectinload(Document.tags))
         .filter(Document.id.in_(req.document_ids), Document.deleted_at.is_(None))
-        .all()
     )
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
+    docs = query.all()
 
     # Resolve/create tags to add
     tags_to_add = []
     for tag_name in req.add_tags:
-        tag = db.query(Tag).filter(Tag.name == tag_name).first()
+        tag = db.query(Tag).filter(Tag.name == tag_name, Tag.user_id == user.id).first()
         if not tag:
-            tag = Tag(name=tag_name, color="#6B7280")
+            tag = Tag(name=tag_name, color="#6B7280", user_id=user.id)
             db.add(tag)
             db.flush()
         tags_to_add.append(tag)
@@ -372,26 +408,32 @@ def bulk_tag_documents(req: BulkTagRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/bulk/delete", status_code=200)
-def bulk_delete_documents(req: BulkDeleteRequest, db: Session = Depends(get_db)):
+def bulk_delete_documents(
+    req: BulkDeleteRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Soft-delete multiple documents."""
     now = datetime.now(timezone.utc)
-    count = (
-        db.query(Document)
-        .filter(Document.id.in_(req.document_ids), Document.deleted_at.is_(None))
-        .update({Document.deleted_at: now}, synchronize_session="fetch")
-    )
+    query = db.query(Document).filter(Document.id.in_(req.document_ids), Document.deleted_at.is_(None))
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
+    count = query.update({Document.deleted_at: now}, synchronize_session="fetch")
     db.commit()
     return {"detail": f"Deleted {count} documents"}
 
 
 @router.post("/bulk/reprocess", status_code=200)
-def bulk_reprocess_documents(req: BulkReprocessRequest, db: Session = Depends(get_db)):
+def bulk_reprocess_documents(
+    req: BulkReprocessRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Create OCR jobs for multiple documents."""
-    docs = (
-        db.query(Document)
-        .filter(Document.id.in_(req.document_ids), Document.deleted_at.is_(None))
-        .all()
-    )
+    query = db.query(Document).filter(Document.id.in_(req.document_ids), Document.deleted_at.is_(None))
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
+    docs = query.all()
 
     jobs = []
     for doc in docs:
@@ -420,9 +462,13 @@ def export_documents_csv(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     """Export document metadata as CSV."""
     query = db.query(Document).filter(Document.deleted_at.is_(None))
+
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
 
     if document_type:
         query = query.filter(Document.document_type == document_type)
@@ -469,14 +515,20 @@ def export_documents_csv(
 
 
 @router.get("/{document_id}", response_model=DocumentDetail)
-def get_document(document_id: UUID, db: Session = Depends(get_db)):
+def get_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """Get a single document with full metadata and tags."""
-    doc = (
+    query = (
         db.query(Document)
         .options(selectinload(Document.tags))
         .filter(Document.id == document_id, Document.deleted_at.is_(None))
-        .first()
     )
+    if user.role != "admin":
+        query = query.filter(Document.user_id == user.id)
+    doc = query.first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
@@ -487,9 +539,10 @@ def update_document(
     document_id: UUID,
     update: DocumentUpdateRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
 ):
     """Update document name, tags, and/or AI-generated fields."""
-    doc = _get_document_or_404(db, document_id)
+    doc = _get_document_or_404(db, document_id, user)
 
     search_dirty = False
     if update.original_name is not None:
@@ -529,9 +582,9 @@ def update_document(
     if update.tags is not None:
         new_tags = []
         for tag_name in update.tags:
-            tag = db.query(Tag).filter(Tag.name == tag_name).first()
+            tag = db.query(Tag).filter(Tag.name == tag_name, Tag.user_id == user.id).first()
             if not tag:
-                tag = Tag(name=tag_name, color="#6B7280")
+                tag = Tag(name=tag_name, color="#6B7280", user_id=user.id)
                 db.add(tag)
                 db.flush()
             new_tags.append(tag)
@@ -553,18 +606,26 @@ def update_document(
 
 
 @router.delete("/{document_id}", status_code=200)
-def delete_document(document_id: UUID, db: Session = Depends(get_db)):
+def delete_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Soft-delete a document."""
-    doc = _get_document_or_404(db, document_id)
+    doc = _get_document_or_404(db, document_id, user)
     doc.deleted_at = datetime.now(timezone.utc)
     db.commit()
     return {"detail": "Document deleted"}
 
 
 @router.get("/{document_id}/download")
-def download_document(document_id: UUID, db: Session = Depends(get_db)):
+def download_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     """Download the document file."""
-    doc = _get_document_or_404(db, document_id)
+    doc = _get_document_or_404(db, document_id, user)
     abs_path = Path(settings.UPLOAD_DIR) / doc.file_path
     if not abs_path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
@@ -585,9 +646,13 @@ def download_document(document_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/{document_id}/reprocess", response_model=ReprocessResponse)
-def reprocess_document(document_id: UUID, db: Session = Depends(get_db)):
+def reprocess_document(
+    document_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Trigger reprocessing (OCR followed by AI analysis if configured)."""
-    doc = _get_document_or_404(db, document_id)
+    doc = _get_document_or_404(db, document_id, user)
 
     abs_path = Path(settings.UPLOAD_DIR) / doc.file_path
     if not abs_path.exists():

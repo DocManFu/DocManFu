@@ -38,6 +38,18 @@ alembic/                # Migrations
 uploads/                # Uploaded files stored as {YYYY}/{MM}/{DD}/{uuid}.pdf
 scripts/
   seed_data.py          # Sample data fixtures
+  backup.sh             # Database backup script (pg_dump + gzip, retention)
+  restore.sh            # Interactive database restore script
+frontend/
+  Dockerfile            # Production frontend image (node build + nginx)
+  nginx.conf            # SPA routing + /api proxy + SSE support
+Dockerfile              # Production backend image (multi-stage, non-root)
+docker-compose.yml      # Production compose (db, redis, migrate, api, worker, frontend)
+docker-compose.dev.yml  # Development compose
+dev                     # Development CLI wrapper
+prod                    # Production CLI wrapper
+docs/
+  DEPLOYMENT.md         # Full deployment guide
 ```
 
 ## Key Conventions
@@ -173,6 +185,43 @@ alembic upgrade head                  # Run migrations
 alembic revision -m "description"     # Create new migration
 python scripts/seed_data.py           # Load sample data
 ```
+
+### Production Docker
+```bash
+./prod                    # Start all services (attached)
+./prod up -d              # Start all services (detached)
+./prod down               # Stop and remove containers
+./prod restart [-d]       # Restart all containers
+./prod rebuild [-d]       # Full rebuild with --no-cache
+./prod build              # Build images without starting
+./prod logs [service]     # Follow logs (optionally for one service)
+./prod ps                 # Show container status
+./prod shell [service]    # Open shell in container (default: api)
+./prod clean              # Stop containers and remove volumes (with confirmation)
+./prod migrate            # Run alembic upgrade head in api container
+./prod backup [--uploads] # Create database backup (optionally include uploads)
+./prod restore <file>     # Restore database from backup file
+./prod pull-models        # Pull AI models into Ollama container
+```
+
+Ollama profiles (optional — activate with `--profile`):
+```bash
+./prod up -d --profile ollama      # Ollama with NVIDIA GPU (Linux)
+./prod up -d --profile ollama-cpu  # Ollama CPU-only (any OS)
+./prod pull-models                 # Pull models after Ollama is running
+```
+
+Services: `frontend` (port 8080 — nginx SPA + API proxy), `api`, `worker`, `db`, `redis`, `migrate` (one-shot), `ollama`/`ollama-cpu` (optional via profile)
+
+Production files:
+- `Dockerfile` — Multi-stage backend image (builder + runtime with tesseract/ghostscript, non-root user)
+- `frontend/Dockerfile` — Multi-stage frontend image (node build + nginx)
+- `frontend/nginx.conf` — SPA routing + `/api/` proxy to backend + SSE support
+- `docker-compose.yml` — Production compose (db → redis → migrate → api + worker → frontend)
+- `.env.production.example` — Production env template
+- `scripts/backup.sh` — Database backup with retention cleanup
+- `scripts/restore.sh` — Interactive database restore
+- `docs/DEPLOYMENT.md` — Full deployment guide (reverse proxy, AI config, scaling, troubleshooting)
 
 ## Rules
 - Don't commit to git unless explicitly told to

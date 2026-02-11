@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Table
+from sqlalchemy import Column, DateTime, ForeignKey, String, Table, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,13 +18,20 @@ document_tags = Table(
 
 class Tag(UUIDMixin, Base):
     __tablename__ = "tags"
+    __table_args__ = (
+        UniqueConstraint("name", "user_id", name="uq_tags_name_user_id"),
+    )
 
-    name: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
     color: Mapped[str] = mapped_column(String(7))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+    )
 
+    owner: Mapped[Optional["User"]] = relationship(back_populates="tags")
     documents: Mapped[list["Document"]] = relationship(
         secondary=document_tags, back_populates="tags"
     )
@@ -33,3 +41,4 @@ class Tag(UUIDMixin, Base):
 
 
 from app.models.document import Document  # noqa: E402
+from app.models.user import User  # noqa: E402

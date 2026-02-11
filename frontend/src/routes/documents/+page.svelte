@@ -172,8 +172,12 @@
 		syncFromUrl();
 		fetchDocuments();
 		containerEl?.addEventListener('docnavigate', handleDocNavigate);
+		const unsubDocUpdated = jobStore.onDocumentUpdated(() => {
+			fetchDocuments();
+		});
 		return () => {
 			containerEl?.removeEventListener('docnavigate', handleDocNavigate);
+			unsubDocUpdated();
 		};
 	});
 </script>

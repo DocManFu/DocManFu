@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
 	import * as pdfjsLib from 'pdfjs-dist';
 	import { TextLayer } from 'pdfjs-dist';
 	import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+	import { auth } from '$lib/stores/auth.js';
 
 	pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -43,7 +45,12 @@
 
 		(async () => {
 			try {
-				pdf = await pdfjsLib.getDocument(src).promise;
+				const state = get(auth);
+				const httpHeaders: Record<string, string> = {};
+				if (state.accessToken) {
+					httpHeaders['Authorization'] = `Bearer ${state.accessToken}`;
+				}
+				pdf = await pdfjsLib.getDocument({ url: src, httpHeaders }).promise;
 				pageCount = pdf.numPages;
 				loading = false;
 

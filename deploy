@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_ENV="$SCRIPT_DIR/.env.deploy"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+info()  { echo -e "${BLUE}${BOLD}[info]${NC}  $*"; }
+ok()    { echo -e "${GREEN}${BOLD}[ok]${NC}    $*"; }
+warn()  { echo -e "${YELLOW}${BOLD}[warn]${NC}  $*"; }
+err()   { echo -e "${RED}${BOLD}[error]${NC} $*" >&2; }
+
+usage() {
+    cat <<EOF
+${BOLD}DocManFu Deploy${NC}
+
+Syncs local code to a remote server and rebuilds Docker containers.
+
+${BOLD}Usage:${NC} ./deploy [options] [service...]
+
+${BOLD}Options:${NC}
+  --dry-run       Show what would be synced without doing it
+  --sync-only     Sync files but don't rebuild
+  --build-only    Rebuild on server without syncing
+  -h, --help      Show this help message
+
+${BOLD}Examples:${NC}
+  ./deploy                   Sync everything and rebuild changed services
+  ./deploy frontend          Sync and rebuild only the frontend
+  ./deploy api worker        Sync and rebuild api + worker
+  ./deploy --dry-run         Preview what files would be synced
+  ./deploy --sync-only       Sync files without rebuilding
+
+${BOLD}Setup:${NC}
+  cp .env.deploy.example .env.deploy   # then edit with your server details
+EOF
+}
+
+# Load config
+if [[ ! -f "$DEPLOY_ENV" ]]; then
+    err "Missing $DEPLOY_ENV"
+    echo "  cp .env.deploy.example .env.deploy  # then edit with your server details"
+    exit 1
+fi
+
+# Parse .env.deploy (handles quotes, skips comments/blanks)
+while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"              # strip inline comments
+    line="${line%"${line##*[![:space:]]}"}"  # trim trailing whitespace
+    [[ -z "$line" || "$line" != *=* ]] && continue
+    key="${line%%=*}"
+    val="${line#*=}"
+    val="${val%\"}" ; val="${val#\"}"   # strip double quotes
+    val="${val%\'}" ; val="${val#\'}"   # strip single quotes
+    export "$key=$val"
+done < "$DEPLOY_ENV"
+
+: "${DEPLOY_HOST:?Set DEPLOY_HOST in .env.deploy}"
+: "${DEPLOY_PATH:?Set DEPLOY_PATH in .env.deploy}"
+DEPLOY_PROFILE="${DEPLOY_PROFILE:-}"
+
+# Parse args
+DRY_RUN=false
+SYNC_ONLY=false
+BUILD_ONLY=false
+SERVICES=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run)    DRY_RUN=true; shift ;;
+        --sync-only)  SYNC_ONLY=true; shift ;;
+        --build-only) BUILD_ONLY=true; shift ;;
+        -h|--help)    usage; exit 0 ;;
+        -*)           err "Unknown option: $1"; usage; exit 1 ;;
+        *)            SERVICES+=("$1"); shift ;;
+    esac
+done
+
+RSYNC_EXCLUDES=(
+    --exclude node_modules
+    --exclude .git
+    --exclude venv
+    --exclude env
+    --exclude __pycache__
+    --exclude uploads
+    --exclude backups
+    --exclude .env
+    --exclude .env.deploy
+    --exclude .env.local
+    --exclude .env.production
+    --exclude '*.pyc'
+    --exclude '.DS_Store'
+)
+
+# --- Sync ---
+if [[ "$BUILD_ONLY" == false ]]; then
+    if [[ "$DRY_RUN" == true ]]; then
+        info "Dry run — files that would be synced:"
+        rsync -avzn "${RSYNC_EXCLUDES[@]}" "$SCRIPT_DIR/" "$DEPLOY_HOST:$DEPLOY_PATH/"
+        exit 0
+    fi
+
+    info "Syncing to ${DEPLOY_HOST}:${DEPLOY_PATH}..."
+    rsync -avz --delete "${RSYNC_EXCLUDES[@]}" "$SCRIPT_DIR/" "$DEPLOY_HOST:$DEPLOY_PATH/"
+    ok "Files synced"
+fi
+
+# --- Build ---
+if [[ "$SYNC_ONLY" == true ]]; then
+    ok "Sync complete (--sync-only, skipping build)"
+    exit 0
+fi
+
+PROFILE_ARGS=""
+if [[ -n "$DEPLOY_PROFILE" ]]; then
+    PROFILE_ARGS="--profile $DEPLOY_PROFILE"
+fi
+
+if [[ ${#SERVICES[@]} -gt 0 ]]; then
+    info "Rebuilding ${SERVICES[*]}..."
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS up -d --build ${SERVICES[*]}"
+else
+    info "Rebuilding all services..."
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS up -d --build"
+fi
+
+ok "Deploy complete"

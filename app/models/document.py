@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import BigInteger, Date, DateTime, String, Text
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSON, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,10 +41,14 @@ class Document(UUIDMixin, TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     bill_due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+    )
     search_vector: Mapped[Optional[str]] = mapped_column(
         TSVECTOR, nullable=True
     )
 
+    owner: Mapped[Optional["User"]] = relationship(back_populates="documents")
     tags: Mapped[list["Tag"]] = relationship(
         secondary="document_tags", back_populates="documents"
     )
@@ -59,3 +63,4 @@ class Document(UUIDMixin, TimestampMixin, Base):
 # Avoid circular import issues - these are resolved at runtime
 from app.models.tag import Tag  # noqa: E402
 from app.models.processing_job import ProcessingJob  # noqa: E402
+from app.models.user import User  # noqa: E402

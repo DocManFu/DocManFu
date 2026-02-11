@@ -6,8 +6,10 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user, require_write_access
 from app.db.deps import get_db
 from app.models.tag import Tag, document_tags
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -53,20 +55,19 @@ class TagResponse(BaseModel):
 
 
 @router.get("", response_model=list[TagWithCount])
-def list_tags(db: Session = Depends(get_db)):
+def list_tags(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """List all tags with their document counts."""
-    rows = (
-        db.query(
-            Tag.id,
-            Tag.name,
-            Tag.color,
-            func.count(document_tags.c.document_id).label("document_count"),
-        )
-        .outerjoin(document_tags, Tag.id == document_tags.c.tag_id)
-        .group_by(Tag.id)
-        .order_by(Tag.name)
-        .all()
-    )
+    query = db.query(
+        Tag.id,
+        Tag.name,
+        Tag.color,
+        func.count(document_tags.c.document_id).label("document_count"),
+    ).outerjoin(document_tags, Tag.id == document_tags.c.tag_id)
+
+    if user.role != "admin":
+        query = query.filter(Tag.user_id == user.id)
+
+    rows = query.group_by(Tag.id).order_by(Tag.name).all()
     return [
         TagWithCount(id=r.id, name=r.name, color=r.color, document_count=r.document_count)
         for r in rows
@@ -74,13 +75,17 @@ def list_tags(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=TagResponse, status_code=201)
-def create_tag(req: TagCreateRequest, db: Session = Depends(get_db)):
+def create_tag(
+    req: TagCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Create a new tag."""
-    existing = db.query(Tag).filter(Tag.name == req.name).first()
+    existing = db.query(Tag).filter(Tag.name == req.name, Tag.user_id == user.id).first()
     if existing:
         raise HTTPException(status_code=409, detail="Tag already exists")
 
-    tag = Tag(name=req.name, color=req.color)
+    tag = Tag(name=req.name, color=req.color, user_id=user.id)
     db.add(tag)
     db.commit()
     db.refresh(tag)
@@ -88,14 +93,22 @@ def create_tag(req: TagCreateRequest, db: Session = Depends(get_db)):
 
 
 @router.put("/{tag_id}", response_model=TagResponse)
-def update_tag(tag_id: UUID, req: TagUpdateRequest, db: Session = Depends(get_db)):
+def update_tag(
+    tag_id: UUID,
+    req: TagUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Update a tag's name or color."""
-    tag = db.get(Tag, tag_id)
+    query = db.query(Tag).filter(Tag.id == tag_id)
+    if user.role != "admin":
+        query = query.filter(Tag.user_id == user.id)
+    tag = query.first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
     if req.name is not None and req.name != tag.name:
-        conflict = db.query(Tag).filter(Tag.name == req.name).first()
+        conflict = db.query(Tag).filter(Tag.name == req.name, Tag.user_id == user.id).first()
         if conflict:
             raise HTTPException(status_code=409, detail="Tag name already in use")
         tag.name = req.name
@@ -109,9 +122,16 @@ def update_tag(tag_id: UUID, req: TagUpdateRequest, db: Session = Depends(get_db
 
 
 @router.delete("/{tag_id}", status_code=200)
-def delete_tag(tag_id: UUID, db: Session = Depends(get_db)):
+def delete_tag(
+    tag_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Delete a tag and remove all associations."""
-    tag = db.get(Tag, tag_id)
+    query = db.query(Tag).filter(Tag.id == tag_id)
+    if user.role != "admin":
+        query = query.filter(Tag.user_id == user.id)
+    tag = query.first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
@@ -123,16 +143,26 @@ def delete_tag(tag_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/merge", status_code=200)
-def merge_tags(req: TagMergeRequest, db: Session = Depends(get_db)):
+def merge_tags(
+    req: TagMergeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write_access),
+):
     """Merge source tags into a target tag. Moves associations and deletes sources."""
-    target = db.get(Tag, req.target_tag_id)
+    query = db.query(Tag).filter(Tag.id == req.target_tag_id)
+    if user.role != "admin":
+        query = query.filter(Tag.user_id == user.id)
+    target = query.first()
     if not target:
         raise HTTPException(status_code=404, detail="Target tag not found")
 
     for source_id in req.source_tag_ids:
         if source_id == req.target_tag_id:
             continue
-        source = db.get(Tag, source_id)
+        sq = db.query(Tag).filter(Tag.id == source_id)
+        if user.role != "admin":
+            sq = sq.filter(Tag.user_id == user.id)
+        source = sq.first()
         if not source:
             continue
 
