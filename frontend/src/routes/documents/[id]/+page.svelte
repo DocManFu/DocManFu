@@ -2,12 +2,14 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { getAuthHeader } from '$lib/api/client.js';
 	import {
 		getDocument,
 		updateDocument,
 		deleteDocument,
 		reprocessDocument,
-		getDownloadUrl
+		getDownloadUrl,
+		downloadDocument
 	} from '$lib/api/documents.js';
 	import { updateBillStatus, updateBillDueDate } from '$lib/api/bills.js';
 	import { getDocumentJobHistory } from '$lib/api/jobs.js';
@@ -55,6 +57,21 @@
 	let loadingJobs = $state(false);
 
 	let searchQuery = $derived($page.url.searchParams.get('q') ?? '');
+	let imageBlobUrl = $state<string | null>(null);
+
+	$effect(() => {
+		if (doc && doc.mime_type.startsWith('image/')) {
+			const url = getDownloadUrl(doc.id);
+			fetch(url, { headers: getAuthHeader() })
+				.then((res) => res.blob())
+				.then((blob) => {
+					imageBlobUrl = URL.createObjectURL(blob);
+				});
+			return () => {
+				if (imageBlobUrl) URL.revokeObjectURL(imageBlobUrl);
+			};
+		}
+	});
 
 	let isBill = $derived(doc?.document_type === 'bill' || doc?.document_type === 'invoice' || !!doc?.bill_status);
 
@@ -364,13 +381,12 @@
 
 			<!-- Actions -->
 			<div class="flex flex-wrap items-center gap-2">
-				<a
-					href={getDownloadUrl(doc.id)}
-					class="btn-secondary btn-sm no-underline"
-					download
+				<button
+					class="btn-secondary btn-sm"
+					onclick={() => doc && downloadDocument(doc.id, displayName + '.pdf')}
 				>
 					<span class="i-lucide-download mr-1"></span>Download
-				</a>
+				</button>
 				<button
 					class="btn-secondary btn-sm"
 					onclick={handleReprocess}
@@ -606,11 +622,13 @@
 		<div class="flex-1 min-w-0">
 			{#if doc.mime_type.startsWith('image/')}
 				<div class="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800 p-4 overflow-auto">
-					<img
-						src={getDownloadUrl(doc.id)}
-						alt={displayName}
-						class="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-					/>
+					{#if imageBlobUrl}
+						<img
+							src={imageBlobUrl}
+							alt={displayName}
+							class="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+						/>
+					{/if}
 				</div>
 			{:else}
 				<PdfPreview src={getDownloadUrl(doc.id)} highlight={searchQuery} />

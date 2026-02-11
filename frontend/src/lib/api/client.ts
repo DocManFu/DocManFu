@@ -11,7 +11,7 @@ export class ApiError extends Error {
 	}
 }
 
-function getAuthHeader(): Record<string, string> {
+export function getAuthHeader(): Record<string, string> {
 	const state = get(auth);
 	if (state.accessToken) {
 		return { Authorization: `Bearer ${state.accessToken}` };
@@ -98,6 +98,45 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 
 	if (res.status === 204) return undefined as T;
 	return res.json();
+}
+
+export async function apiDownload(path: string, fallbackFilename: string): Promise<void> {
+	let res = await fetch(path, { headers: getAuthHeader() });
+
+	if (res.status === 401) {
+		const refreshed = await attemptTokenRefresh();
+		if (refreshed) {
+			res = await fetch(path, { headers: getAuthHeader() });
+		}
+		if (!refreshed || !res.ok) {
+			auth.logout();
+			if (typeof window !== 'undefined') {
+				window.location.href = '/auth/login';
+			}
+			throw new ApiError(401, 'Session expired');
+		}
+	}
+
+	if (!res.ok) {
+		throw new ApiError(res.status, `Download failed with status ${res.status}`);
+	}
+
+	const disposition = res.headers.get('Content-Disposition');
+	let filename = fallbackFilename;
+	if (disposition) {
+		const match = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
+		if (match) filename = decodeURIComponent(match[1].replace(/"/g, ''));
+	}
+
+	const blob = await res.blob();
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = filename;
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+	URL.revokeObjectURL(url);
 }
 
 export async function apiUpload<T>(path: string, file: File): Promise<T> {

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { listDocuments, bulkDeleteDocuments, bulkReprocessDocuments, getExportCsvUrl } from '$lib/api/documents.js';
+	import { listDocuments, bulkDeleteDocuments, bulkReprocessDocuments, downloadExportCsv } from '$lib/api/documents.js';
 	import type { DocumentListItem, ListDocumentsParams } from '$lib/types/index.js';
 	import DocumentCard from '$lib/components/documents/DocumentCard.svelte';
 	import DocumentRow from '$lib/components/documents/DocumentRow.svelte';
@@ -280,8 +280,9 @@
 		<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Documents</h1>
 		<div class="flex items-center gap-2">
 			<ViewToggle value={currentViewMode} onchange={handleViewModeChange} />
-			<a
-				href={getExportCsvUrl({
+			<button
+				class="btn-secondary btn-sm"
+				onclick={() => downloadExportCsv({
 					document_type: documentType || undefined,
 					tag: tags.length > 0 ? tags.join(',') : undefined,
 					date_from: dateFrom || undefined,
@@ -289,11 +290,9 @@
 					untagged: untagged ? 'true' : undefined,
 					untyped: untyped ? 'true' : undefined
 				})}
-				class="btn-secondary btn-sm no-underline"
-				download
 			>
 				<span class="i-lucide-download mr-1"></span>CSV
-			</a>
+			</button>
 			<button
 				class="btn-secondary btn-sm"
 				onclick={() => selectMode ? exitSelectMode() : (selectMode = true)}

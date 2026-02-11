@@ -1,4 +1,4 @@
-import { apiFetch, apiUpload } from './client.js';
+import { apiFetch, apiUpload, apiDownload } from './client.js';
 import type {
 	PaginatedResponse,
 	SearchPaginatedResponse,
@@ -77,6 +77,10 @@ export function bulkReprocessDocuments(data: BulkReprocessRequest): Promise<{ de
 	});
 }
 
-export function getExportCsvUrl(params: Record<string, string | undefined> = {}): string {
-	return `/api/documents/export/csv${buildQuery(params)}`;
+export function downloadDocument(id: string, filename: string): Promise<void> {
+	return apiDownload(`/api/documents/${id}/download`, filename);
+}
+
+export function downloadExportCsv(params: Record<string, string | undefined> = {}): Promise<void> {
+	return apiDownload(`/api/documents/export/csv${buildQuery(params)}`, 'documents.csv');
 }
