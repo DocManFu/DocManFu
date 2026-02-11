@@ -43,6 +43,9 @@
 	// Bill state
 	let updatingBill = $state(false);
 
+	// Copy state
+	let copied = $state(false);
+
 	let searchQuery = $derived($page.url.searchParams.get('q') ?? '');
 
 	let isBill = $derived(doc?.document_type === 'bill' || doc?.document_type === 'invoice' || !!doc?.bill_status);
@@ -378,10 +381,24 @@
 			<!-- Content text -->
 			{#if doc.content_text}
 				<div class="card p-4">
-					<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
-						<span class="i-lucide-text"></span>
-						Extracted Text
-					</h3>
+					<div class="flex items-center justify-between mb-3">
+						<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
+							<span class="i-lucide-text"></span>
+							Extracted Text
+						</h3>
+						<button
+							class="btn-ghost btn-sm flex items-center gap-1"
+							title="Copy text to clipboard"
+							onclick={() => {
+								navigator.clipboard.writeText(doc.content_text ?? '');
+								copied = true;
+								setTimeout(() => (copied = false), 2000);
+							}}
+						>
+							<span class={copied ? 'i-lucide-check text-green-500' : 'i-lucide-copy'}></span>
+							<span class="text-xs">{copied ? 'Copied!' : 'Copy'}</span>
+						</button>
+					</div>
 					<pre class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">{doc.content_text}</pre>
 				</div>
 			{/if}
