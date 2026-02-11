@@ -119,6 +119,9 @@ class UploadResponse(BaseModel):
 class DocumentUpdateRequest(BaseModel):
     original_name: str | None = None
     tags: list[str] | None = None  # Tag names — found or created
+    ai_generated_name: str | None = None
+    document_type: str | None = None
+    ai_metadata: dict | None = None
 
 
 class ReprocessResponse(BaseModel):
@@ -485,13 +488,43 @@ def update_document(
     update: DocumentUpdateRequest,
     db: Session = Depends(get_db),
 ):
-    """Update document name and/or tags."""
+    """Update document name, tags, and/or AI-generated fields."""
     doc = _get_document_or_404(db, document_id)
 
-    name_changed = False
+    search_dirty = False
     if update.original_name is not None:
         doc.original_name = update.original_name
-        name_changed = True
+        search_dirty = True
+
+    if update.ai_generated_name is not None:
+        doc.ai_generated_name = update.ai_generated_name
+        search_dirty = True
+
+    if update.document_type is not None:
+        old_type = doc.document_type
+        doc.document_type = update.document_type
+
+        # Bill tracking side effects
+        if update.document_type in ("bill", "invoice"):
+            if doc.bill_status not in ("paid", "dismissed"):
+                doc.bill_status = "unpaid"
+            # Parse due_date from ai_metadata (use updated or existing)
+            meta = update.ai_metadata if update.ai_metadata is not None else (doc.ai_metadata or {})
+            raw_due = meta.get("due_date")
+            if raw_due:
+                try:
+                    doc.bill_due_date = date.fromisoformat(raw_due)
+                except (ValueError, TypeError):
+                    pass
+        elif old_type in ("bill", "invoice") and update.document_type not in ("bill", "invoice"):
+            # Changed away from bill — clear bill fields
+            doc.bill_status = None
+            doc.bill_due_date = None
+            doc.bill_paid_at = None
+
+    if update.ai_metadata is not None:
+        doc.ai_metadata = update.ai_metadata
+        search_dirty = True
 
     if update.tags is not None:
         new_tags = []
@@ -506,7 +539,7 @@ def update_document(
 
     db.commit()
 
-    if name_changed:
+    if search_dirty:
         update_search_vector(db, document_id)
 
     # Re-fetch with tags eagerly loaded for response

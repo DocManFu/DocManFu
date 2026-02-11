@@ -6,13 +6,37 @@
 
 	pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-	interface Props { src: string; }
-	let { src }: Props = $props();
+	interface Props { src: string; highlight?: string; }
+	let { src, highlight = '' }: Props = $props();
 
 	let canvasContainer: HTMLDivElement;
 	let loading = $state(true);
 	let error = $state('');
 	let pageCount = $state(0);
+	let matchCount = $state(0);
+	let highlightActive = $state(!!highlight);
+
+	function highlightMatches(textLayerDiv: HTMLElement, query: string) {
+		if (!query.trim()) return 0;
+		const words = query.trim().toLowerCase().split(/\s+/);
+		let count = 0;
+		for (const span of textLayerDiv.querySelectorAll('span')) {
+			const text = span.textContent?.toLowerCase() ?? '';
+			if (words.some((w) => text.includes(w))) {
+				span.classList.add('highlight');
+				count++;
+			}
+		}
+		return count;
+	}
+
+	function clearHighlights() {
+		highlightActive = false;
+		matchCount = 0;
+		for (const el of canvasContainer.querySelectorAll('.highlight')) {
+			el.classList.remove('highlight');
+		}
+	}
 
 	onMount(() => {
 		let pdf: pdfjsLib.PDFDocumentProxy | undefined;
@@ -68,6 +92,17 @@
 						viewport,
 					});
 					await textLayer.render();
+
+					// Highlight search matches
+					if (highlight && highlightActive) {
+						matchCount += highlightMatches(textLayerDiv, highlight);
+					}
+				}
+
+				// Scroll first match into view
+				if (highlightActive && matchCount > 0) {
+					const first = canvasContainer.querySelector('.highlight');
+					first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 				}
 			} catch (e) {
 				error = e instanceof Error ? e.message : 'Failed to load PDF';
@@ -92,6 +127,19 @@
 			<div class="flex items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400">
 				<span class="i-lucide-file-text mr-1"></span>
 				{pageCount} {pageCount === 1 ? 'page' : 'pages'}
+				{#if highlightActive && matchCount > 0}
+					<span class="mx-2 text-gray-300 dark:text-gray-600">|</span>
+					<span class="text-amber-600 dark:text-amber-400">
+						{matchCount} {matchCount === 1 ? 'match' : 'matches'}
+					</span>
+					<button
+						class="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+						title="Clear highlights"
+						onclick={clearHighlights}
+					>
+						<span class="i-lucide-x text-sm"></span>
+					</button>
+				{/if}
 			</div>
 		{/if}
 		<div class="flex-1 overflow-y-auto p-4">
@@ -172,6 +220,11 @@
 
 	:global(.textLayer br::selection) {
 		background: transparent;
+	}
+
+	:global(.textLayer .highlight) {
+		background: rgba(251, 191, 36, 0.4);
+		border-radius: 2px;
 	}
 
 	:global(.textLayer .endOfContent) {

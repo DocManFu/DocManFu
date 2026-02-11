@@ -10,7 +10,7 @@
 		getDownloadUrl
 	} from '$lib/api/documents.js';
 	import { updateBillStatus } from '$lib/api/bills.js';
-	import type { DocumentDetail } from '$lib/types/index.js';
+	import type { DocumentDetail, DocumentUpdateRequest } from '$lib/types/index.js';
 	import DocumentMeta from '$lib/components/documents/DocumentMeta.svelte';
 	import PdfPreview from '$lib/components/documents/PdfPreview.svelte';
 	import TagInput from '$lib/components/tags/TagInput.svelte';
@@ -23,10 +23,15 @@
 	let loading = $state(true);
 	let error = $state('');
 
-	// Edit state
+	// Edit state — original name
 	let editingName = $state(false);
 	let editName = $state('');
 	let saving = $state(false);
+
+	// Edit state — AI-generated name
+	let editingAiName = $state(false);
+	let editAiName = $state('');
+	let savingAiName = $state(false);
 
 	// Delete state
 	let showDeleteDialog = $state(false);
@@ -37,6 +42,8 @@
 
 	// Bill state
 	let updatingBill = $state(false);
+
+	let searchQuery = $derived($page.url.searchParams.get('q') ?? '');
 
 	let isBill = $derived(doc?.document_type === 'bill' || doc?.document_type === 'invoice' || !!doc?.bill_status);
 
@@ -75,6 +82,40 @@
 
 	function cancelEditName() {
 		editingName = false;
+	}
+
+	function startEditAiName() {
+		editAiName = doc?.ai_generated_name ?? '';
+		editingAiName = true;
+	}
+
+	async function saveAiName() {
+		if (!doc || !editAiName.trim()) return;
+		savingAiName = true;
+		try {
+			doc = await updateDocument(doc.id, { ai_generated_name: editAiName.trim() });
+			editingAiName = false;
+			toasts.success('AI name updated');
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to update AI name');
+		} finally {
+			savingAiName = false;
+		}
+	}
+
+	function cancelEditAiName() {
+		editingAiName = false;
+	}
+
+	function handleAiNameKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') saveAiName();
+		if (e.key === 'Escape') cancelEditAiName();
+	}
+
+	async function handleMetaUpdate(fields: DocumentUpdateRequest) {
+		if (!doc) return;
+		doc = await updateDocument(doc.id, fields);
+		toasts.success('AI analysis updated');
 	}
 
 	async function handleTagsChange(tagNames: string[]) {
@@ -168,30 +209,79 @@
 
 			<!-- Name -->
 			<div>
-				{#if editingName}
-					<div class="flex items-center gap-2">
-						<input
-							type="text"
-							class="input-base text-base font-bold flex-1"
-							bind:value={editName}
-							onkeydown={handleNameKeydown}
-						/>
-						<button class="btn-primary btn-sm" onclick={saveName} disabled={saving}>Save</button>
-						<button class="btn-ghost btn-sm" onclick={cancelEditName}>Cancel</button>
-					</div>
+				{#if doc.ai_generated_name}
+					<!-- AI name (primary display) -->
+					{#if editingAiName}
+						<div class="flex items-center gap-2">
+							<input
+								type="text"
+								class="input-base text-base font-bold flex-1"
+								bind:value={editAiName}
+								onkeydown={handleAiNameKeydown}
+							/>
+							<button class="btn-primary btn-sm" onclick={saveAiName} disabled={savingAiName}>Save</button>
+							<button class="btn-ghost btn-sm" onclick={cancelEditAiName}>Cancel</button>
+						</div>
+					{:else}
+						<div class="flex items-center gap-1 group">
+							<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">{doc.ai_generated_name}</h1>
+							<button
+								class="btn-icon opacity-0 group-hover:opacity-100 flex-shrink-0"
+								title="Edit AI name"
+								onclick={startEditAiName}
+							>
+								<span class="i-lucide-pencil text-sm"></span>
+							</button>
+						</div>
+					{/if}
+					<!-- Original name (secondary, also editable) -->
+					{#if editingName}
+						<div class="flex items-center gap-2 mt-1">
+							<input
+								type="text"
+								class="input-base text-sm flex-1"
+								bind:value={editName}
+								onkeydown={handleNameKeydown}
+							/>
+							<button class="btn-primary btn-sm" onclick={saveName} disabled={saving}>Save</button>
+							<button class="btn-ghost btn-sm" onclick={cancelEditName}>Cancel</button>
+						</div>
+					{:else}
+						<div class="flex items-center gap-1 group mt-1">
+							<p class="text-sm text-gray-500 dark:text-gray-400">Original: {doc.original_name}</p>
+							<button
+								class="btn-icon opacity-0 group-hover:opacity-100 flex-shrink-0"
+								title="Edit original name"
+								onclick={startEditName}
+							>
+								<span class="i-lucide-pencil text-xs"></span>
+							</button>
+						</div>
+					{/if}
 				{:else}
-					<div class="flex items-center gap-1 group">
-						<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">{displayName}</h1>
-						<button
-							class="btn-icon opacity-0 group-hover:opacity-100 flex-shrink-0"
-							title="Edit name"
-							onclick={startEditName}
-						>
-							<span class="i-lucide-pencil text-sm"></span>
-						</button>
-					</div>
-					{#if doc.ai_generated_name && doc.ai_generated_name !== doc.original_name}
-						<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Original: {doc.original_name}</p>
+					<!-- No AI name — original name is primary -->
+					{#if editingName}
+						<div class="flex items-center gap-2">
+							<input
+								type="text"
+								class="input-base text-base font-bold flex-1"
+								bind:value={editName}
+								onkeydown={handleNameKeydown}
+							/>
+							<button class="btn-primary btn-sm" onclick={saveName} disabled={saving}>Save</button>
+							<button class="btn-ghost btn-sm" onclick={cancelEditName}>Cancel</button>
+						</div>
+					{:else}
+						<div class="flex items-center gap-1 group">
+							<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">{doc.original_name}</h1>
+							<button
+								class="btn-icon opacity-0 group-hover:opacity-100 flex-shrink-0"
+								title="Edit name"
+								onclick={startEditName}
+							>
+								<span class="i-lucide-pencil text-sm"></span>
+							</button>
+						</div>
 					{/if}
 				{/if}
 			</div>
@@ -273,7 +363,7 @@
 
 			<!-- Metadata -->
 			<div class="card p-4">
-				<DocumentMeta document={doc} />
+				<DocumentMeta document={doc} onupdate={handleMetaUpdate} />
 			</div>
 
 			<!-- Tags -->
@@ -299,7 +389,7 @@
 
 		<!-- Right: PDF viewer -->
 		<div class="flex-1 min-w-0">
-			<PdfPreview src={getDownloadUrl(doc.id)} />
+			<PdfPreview src={getDownloadUrl(doc.id)} highlight={searchQuery} />
 		</div>
 	</div>
 

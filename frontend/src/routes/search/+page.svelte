@@ -110,7 +110,7 @@
 		<div class="space-y-3 mb-6">
 			{#each documents as doc (doc.id)}
 				<a
-					href="/documents/{doc.id}"
+					href="/documents/{doc.id}?q={encodeURIComponent(query)}"
 					class="card hover:shadow-md transition-shadow p-4 block no-underline text-inherit"
 				>
 					<div class="flex items-start gap-3">

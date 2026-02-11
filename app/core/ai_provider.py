@@ -20,7 +20,7 @@ Analyze the provided document text and return a JSON object with these fields:
 
 {
   "document_type": "<MUST be exactly one of: bill, invoice, receipt, bank_statement, insurance, medical, tax, legal, correspondence, report, other>",
-  "suggested_name": "<descriptive human-readable filename WITHOUT extension, e.g. 'Comcast Internet Bill 2024-03-15' or 'Fountain Green City Newsletter Jan-Mar 2025'. Use natural title case with spaces. Put the date at the end.>",
+  "suggested_name": "<descriptive human-readable filename WITHOUT extension. Use natural title case with spaces. Put the date at the end.>",
   "suggested_tags": ["<list of 2-5 relevant lowercase tags>"],
   "extracted_metadata": {
     "company": "<company/organization name or null>",
@@ -47,12 +47,15 @@ Document types (pick the best fit):
 - other: none of the above
 
 Rules:
+- CRITICAL: Only use company names, dates, amounts, and other details that appear VERBATIM in the document text. NEVER guess or infer entity names that are not explicitly written in the document.
+- The suggested_name MUST be based solely on information found in the document text. Use the company/organization name exactly as it appears. If no company name is clearly present, use a generic description (e.g. "Escrow Refund Check 2025-12-26" not "Comcast Internet Bill 2025-12-26").
+- If the OCR text is garbled or unclear, lower your confidence_score accordingly and use only the parts you can read with certainty.
 - For bills and invoices, extract the payment due date as due_date. If no explicit due date, use null.
 - Return ONLY valid JSON, no markdown fencing, no extra text.
 - If a field cannot be determined, use null (for strings) or [] (for arrays).
 - The suggested_name should be human-readable and filesystem-safe (no special characters besides hyphens and underscores).
 - Tags should be simple lowercase words or short phrases (e.g. "utility", "bank", "medical", "tax", "quarterly").
-- confidence_score: 0.9+ for clear documents, 0.5-0.8 for partially readable, below 0.5 for unclear.
+- confidence_score: 0.9+ for clear documents, 0.5-0.8 for partially readable, below 0.5 for unclear/garbled text.
 """
 
 
@@ -62,7 +65,7 @@ Analyze the provided page images of a document and return a JSON object with the
 
 {
   "document_type": "<MUST be exactly one of: bill, invoice, receipt, bank_statement, insurance, medical, tax, legal, correspondence, report, other>",
-  "suggested_name": "<descriptive human-readable filename WITHOUT extension, e.g. 'Comcast Internet Bill 2024-03-15' or 'Fountain Green City Newsletter Jan-Mar 2025'. Use natural title case with spaces. Put the date at the end.>",
+  "suggested_name": "<descriptive human-readable filename WITHOUT extension. Use natural title case with spaces. Put the date at the end.>",
   "suggested_tags": ["<list of 2-5 relevant lowercase tags>"],
   "extracted_metadata": {
     "company": "<company/organization name or null>",
@@ -89,13 +92,16 @@ Document types (pick the best fit):
 - other: none of the above
 
 Rules:
+- CRITICAL: Only use company names, dates, amounts, and other details that are VISIBLE in the document images. NEVER guess or infer entity names that do not appear in the document.
+- The suggested_name MUST be based solely on information found in the document. Use the company/organization name exactly as it appears. If no company name is clearly visible, use a generic description (e.g. "Escrow Refund Check 2025-12-26" not "Comcast Internet Bill 2025-12-26").
+- If parts of the document are blurry or hard to read, lower your confidence_score accordingly and use only the parts you can read with certainty.
+- Examine the visual layout, tables, logos, and any text visible in the images.
 - For bills and invoices, extract the payment due date as due_date. If no explicit due date, use null.
 - Return ONLY valid JSON, no markdown fencing, no extra text.
 - If a field cannot be determined, use null (for strings) or [] (for arrays).
 - The suggested_name should be human-readable and filesystem-safe (no special characters besides hyphens and underscores).
 - Tags should be simple lowercase words or short phrases (e.g. "utility", "bank", "medical", "tax", "quarterly").
-- confidence_score: 0.9+ for clear documents, 0.5-0.8 for partially readable, below 0.5 for unclear.
-- Examine the visual layout, tables, logos, and any text visible in the images.
+- confidence_score: 0.9+ for clear documents, 0.5-0.8 for partially readable, below 0.5 for unclear/blurry images.
 """
 
 

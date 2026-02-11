@@ -61,6 +61,9 @@ export interface JobStatusResponse {
 export interface DocumentUpdateRequest {
 	original_name?: string;
 	tags?: string[];
+	ai_generated_name?: string;
+	document_type?: string;
+	ai_metadata?: Record<string, unknown>;
 }
 
 export interface ReprocessResponse {
