@@ -125,6 +125,8 @@ export interface ListDocumentsParams {
 	limit?: number;
 	document_type?: string;
 	tag?: string;
+	untagged?: string;
+	untyped?: string;
 	date_from?: string;
 	date_to?: string;
 	sort_by?: 'upload_date' | 'name' | 'size' | 'type';

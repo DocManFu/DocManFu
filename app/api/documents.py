@@ -179,7 +179,9 @@ def _get_document_or_404(db: Session, document_id: UUID, user: User) -> Document
 def search_documents(
     q: str = Query(..., min_length=1, description="Search query"),
     document_type: str | None = Query(None),
-    tag: str | None = Query(None, description="Filter by tag name"),
+    tag: str | None = Query(None, description="Filter by tag name (comma-separated for multiple)"),
+    untagged: bool = Query(False, description="Show only documents with no tags"),
+    untyped: bool = Query(False, description="Show only documents with no document type"),
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -210,7 +212,13 @@ def search_documents(
     if document_type:
         query = query.filter(Document.document_type == document_type)
     if tag:
-        query = query.filter(Document.tags.any(Tag.name == tag))
+        tag_names = [t.strip() for t in tag.split(",") if t.strip()]
+        for tag_name in tag_names:
+            query = query.filter(Document.tags.any(Tag.name == tag_name))
+    if untagged:
+        query = query.filter(~Document.tags.any())
+    if untyped:
+        query = query.filter(Document.document_type.is_(None))
 
     total = query.count()
     rows = (
@@ -320,7 +328,9 @@ async def upload_document(
 @router.get("", response_model=PaginatedResponse)
 def list_documents(
     document_type: str | None = Query(None, description="Filter by document type"),
-    tag: str | None = Query(None, description="Filter by tag name"),
+    tag: str | None = Query(None, description="Filter by tag name (comma-separated for multiple)"),
+    untagged: bool = Query(False, description="Show only documents with no tags"),
+    untyped: bool = Query(False, description="Show only documents with no document type"),
     date_from: datetime | None = Query(None, description="Filter from date (inclusive)"),
     date_to: datetime | None = Query(None, description="Filter to date (inclusive)"),
     sort_by: str = Query("upload_date", description="Sort field: upload_date, name, size, type"),
@@ -339,7 +349,13 @@ def list_documents(
     if document_type:
         query = query.filter(Document.document_type == document_type)
     if tag:
-        query = query.filter(Document.tags.any(Tag.name == tag))
+        tag_names = [t.strip() for t in tag.split(",") if t.strip()]
+        for tag_name in tag_names:
+            query = query.filter(Document.tags.any(Tag.name == tag_name))
+    if untagged:
+        query = query.filter(~Document.tags.any())
+    if untyped:
+        query = query.filter(Document.document_type.is_(None))
     if date_from:
         query = query.filter(Document.upload_date >= date_from)
     if date_to:
@@ -459,6 +475,8 @@ def bulk_reprocess_documents(
 def export_documents_csv(
     document_type: str | None = Query(None),
     tag: str | None = Query(None),
+    untagged: bool = Query(False),
+    untyped: bool = Query(False),
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     db: Session = Depends(get_db),
@@ -473,7 +491,13 @@ def export_documents_csv(
     if document_type:
         query = query.filter(Document.document_type == document_type)
     if tag:
-        query = query.filter(Document.tags.any(Tag.name == tag))
+        tag_names = [t.strip() for t in tag.split(",") if t.strip()]
+        for tag_name in tag_names:
+            query = query.filter(Document.tags.any(Tag.name == tag_name))
+    if untagged:
+        query = query.filter(~Document.tags.any())
+    if untyped:
+        query = query.filter(Document.document_type.is_(None))
     if date_from:
         query = query.filter(Document.upload_date >= date_from)
     if date_to:

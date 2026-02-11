@@ -1,16 +1,17 @@
 <script lang="ts">
 	import type { DocumentType } from '$lib/types/index.js';
 	import { formatDocumentType } from '$lib/utils/format.js';
+	import TagAutocomplete from '$lib/components/tags/TagAutocomplete.svelte';
 
 	interface Props {
 		documentType: string;
-		tag: string;
+		tags: string[];
 		dateFrom: string;
 		dateTo: string;
 		onchange: () => void;
 	}
 
-	let { documentType = $bindable(), tag = $bindable(), dateFrom = $bindable(), dateTo = $bindable(), onchange }: Props = $props();
+	let { documentType = $bindable(), tags = $bindable(), dateFrom = $bindable(), dateTo = $bindable(), onchange }: Props = $props();
 
 	const docTypes: DocumentType[] = [
 		'bill', 'bank_statement', 'medical', 'insurance', 'tax',
@@ -19,13 +20,18 @@
 
 	function clearFilters() {
 		documentType = '';
-		tag = '';
+		tags = [];
 		dateFrom = '';
 		dateTo = '';
 		onchange();
 	}
 
-	let hasFilters = $derived(documentType || tag || dateFrom || dateTo);
+	function handleTagChange(newTags: string[]) {
+		tags = newTags;
+		onchange();
+	}
+
+	let hasFilters = $derived(documentType || tags.length > 0 || dateFrom || dateTo);
 </script>
 
 <div class="flex flex-wrap items-center gap-3">
@@ -40,13 +46,9 @@
 		{/each}
 	</select>
 
-	<input
-		type="text"
-		class="input-base w-40"
-		placeholder="Filter by tag"
-		bind:value={tag}
-		onchange={() => onchange()}
-	/>
+	<div class="w-56">
+		<TagAutocomplete selected={tags} onchange={handleTagChange} />
+	</div>
 
 	<input
 		type="date"
