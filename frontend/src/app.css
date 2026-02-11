@@ -10,3 +10,21 @@ body {
 	background-color: #f9fafb;
 	color: #111827;
 }
+
+:root.dark body {
+	background-color: #111827;
+	color: #f3f4f6;
+}
+
+/* Search highlight marks */
+mark {
+	background-color: #fef08a;
+	color: inherit;
+	padding: 0 2px;
+	border-radius: 2px;
+}
+
+:root.dark mark {
+	background-color: #854d0e;
+	color: #fef9c3;
+}

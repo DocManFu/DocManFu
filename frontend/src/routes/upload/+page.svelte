@@ -70,14 +70,14 @@
 </svelte:head>
 
 <div class="page-container">
-	<h1 class="text-2xl font-bold text-gray-900 mb-6">Upload Documents</h1>
+	<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Upload Documents</h1>
 
 	<DropZone onfiles={handleFiles} disabled={uploading} />
 
 	{#if uploads.length > 0}
 		<div class="mt-6">
 			<div class="flex items-center justify-between mb-3">
-				<h2 class="text-sm font-medium text-gray-700">Uploads</h2>
+				<h2 class="text-sm font-medium text-gray-700 dark:text-gray-300">Uploads</h2>
 				{#if hasCompleted}
 					<button class="btn-ghost btn-sm text-xs" onclick={clearCompleted}>Clear finished</button>
 				{/if}

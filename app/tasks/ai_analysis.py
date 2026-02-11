@@ -1,8 +1,11 @@
 """AI analysis task – classifies documents and suggests names/tags."""
 
 import logging
+from datetime import date
+from pathlib import Path
 
 from app.core.celery_app import celery_app
+from app.core.config import settings
 from app.models.document import Document
 from app.models.processing_job import JobStatus
 from app.models.tag import Tag
@@ -36,30 +39,60 @@ def process_ai_analysis(self, job_id: str, document_id: str):
             self.mark_job_failed(job_id, f"Document {document_id} not found")
             return
 
-        # --- Phase 1: Read document text (10%) ---
+        # --- Phase 1: Prepare for analysis (10%) ---
         self.update_job_progress(job_id, 10, JobStatus.processing)
 
-        if not document.content_text:
-            self.mark_job_failed(job_id, "No text content available – run OCR first")
-            return
-
         text = document.content_text
-        logger.info(
-            "Analyzing document '%s' (%d chars of text)",
-            document.original_name,
-            len(text),
-        )
+        pdf_path = Path(settings.UPLOAD_DIR) / document.file_path
 
-        # --- Phase 2: Call AI provider (50%) ---
+        # --- Phase 2: Text-first analysis, vision fallback for poor text (50%) ---
         self.update_job_progress(job_id, 20, JobStatus.processing)
 
-        from app.core.ai_provider import analyze_document
+        from app.core.ai_provider import analyze_document, analyze_document_vision
 
-        try:
-            result = analyze_document(text, document.original_name)
-        except ValueError as exc:
-            # Config error (no provider, no key) — don't retry
-            self.mark_job_failed(job_id, str(exc))
+        result = None
+        vision_used = False
+
+        # Use text analysis when we have good extracted text
+        if text:
+            logger.info(
+                "Using text-based analysis for '%s' (%d chars)",
+                document.original_name, len(text),
+            )
+            try:
+                result = analyze_document(text, document.original_name)
+            except ValueError as exc:
+                self.mark_job_failed(job_id, str(exc))
+                return
+
+        # Fall back to vision when text is missing or empty (image-only PDFs,
+        # handwritten docs, poorly scanned content)
+        if result is None and pdf_path.exists():
+            logger.info(
+                "No extracted text for '%s', trying vision analysis",
+                document.original_name,
+            )
+            try:
+                from app.core.pdf_renderer import render_pdf_pages
+
+                images = render_pdf_pages(str(pdf_path))
+                if images:
+                    result = analyze_document_vision(images, document.original_name)
+                    vision_used = True
+            except ValueError as exc:
+                self.mark_job_failed(job_id, str(exc))
+                return
+            except Exception as exc:
+                logger.warning(
+                    "Vision analysis also failed for '%s': %s",
+                    document.original_name, exc,
+                )
+
+        if result is None:
+            self.mark_job_failed(
+                job_id,
+                "No analysis possible — no text content and PDF vision failed",
+            )
             return
 
         self.update_job_progress(job_id, 60, JobStatus.processing)
@@ -77,6 +110,23 @@ def process_ai_analysis(self, job_id: str, document_id: str):
         document.ai_generated_name = result.suggested_name
         document.document_type = result.document_type
         document.ai_metadata = result.extracted_metadata
+
+        # --- Bill tracking ---
+        if result.document_type in ("bill", "invoice"):
+            # Only set to unpaid if not already paid/dismissed
+            if document.bill_status not in ("paid", "dismissed"):
+                document.bill_status = "unpaid"
+            # Parse due_date from extracted metadata
+            raw_due = result.extracted_metadata.get("due_date")
+            if raw_due:
+                try:
+                    document.bill_due_date = date.fromisoformat(raw_due)
+                except (ValueError, TypeError):
+                    logger.warning("Could not parse due_date '%s'", raw_due)
+        elif document.bill_status == "unpaid":
+            # Reprocessed and no longer a bill — clear unpaid status
+            document.bill_status = None
+            document.bill_due_date = None
 
         # --- Phase 4: Create/associate suggested tags (90%) ---
         self.update_job_progress(job_id, 80, JobStatus.processing)
@@ -96,6 +146,12 @@ def process_ai_analysis(self, job_id: str, document_id: str):
                 document.tags.append(tag)
 
         db.commit()
+
+        # Update search vector
+        from app.core.search import update_search_vector
+
+        update_search_vector(db, document_id)
+
         self.update_job_progress(job_id, 90, JobStatus.processing)
 
         # --- Done ---
@@ -106,6 +162,7 @@ def process_ai_analysis(self, job_id: str, document_id: str):
             "suggested_tags": result.suggested_tags,
             "extracted_metadata": result.extracted_metadata,
             "confidence_score": result.confidence_score,
+            "vision_used": vision_used,
         }
         self.mark_job_completed(job_id, result_data=job_result)
         logger.info("AI analysis complete for document %s", document_id)

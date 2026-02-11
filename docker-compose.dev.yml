@@ -48,6 +48,7 @@ services:
       AI_PROVIDER: ollama
       AI_BASE_URL: http://host.docker.internal:11434
       AI_MODEL: llama3.2
+      AI_VISION_MODEL: granite3.2-vision
     depends_on:
       db:
         condition: service_healthy
@@ -69,6 +70,7 @@ services:
       AI_PROVIDER: ollama
       AI_BASE_URL: http://host.docker.internal:11434
       AI_MODEL: llama3.2
+      AI_VISION_MODEL: granite3.2-vision
       AI_TIMEOUT: 120
     depends_on:
       db:

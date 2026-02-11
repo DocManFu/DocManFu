@@ -9,8 +9,10 @@
 		reprocessDocument,
 		getDownloadUrl
 	} from '$lib/api/documents.js';
+	import { updateBillStatus } from '$lib/api/bills.js';
 	import type { DocumentDetail } from '$lib/types/index.js';
 	import DocumentMeta from '$lib/components/documents/DocumentMeta.svelte';
+	import PdfPreview from '$lib/components/documents/PdfPreview.svelte';
 	import TagInput from '$lib/components/tags/TagInput.svelte';
 	import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte';
 	import LoadingSpinner from '$lib/components/shared/LoadingSpinner.svelte';
@@ -33,13 +35,18 @@
 	// Reprocess state
 	let reprocessing = $state(false);
 
+	// Bill state
+	let updatingBill = $state(false);
+
+	let isBill = $derived(doc?.document_type === 'bill' || doc?.document_type === 'invoice' || !!doc?.bill_status);
+
 	let displayName = $derived(doc?.ai_generated_name || doc?.original_name || '');
 
 	async function loadDocument() {
 		loading = true;
 		error = '';
 		try {
-			doc = await getDocument($page.params.id);
+			doc = await getDocument($page.params.id!);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load document';
 		} finally {
@@ -111,6 +118,21 @@
 		}
 	}
 
+	async function handleBillStatus(status: 'paid' | 'dismissed' | 'unpaid') {
+		if (!doc) return;
+		updatingBill = true;
+		try {
+			const res = await updateBillStatus(doc.id, status);
+			doc.bill_status = res.bill_status;
+			doc.bill_paid_at = res.bill_paid_at;
+			toasts.success(res.detail);
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to update bill status');
+		} finally {
+			updatingBill = false;
+		}
+	}
+
 	function handleNameKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter') saveName();
 		if (e.key === 'Escape') cancelEditName();
@@ -123,111 +145,170 @@
 	<title>{displayName || 'Document'} - DocManFu</title>
 </svelte:head>
 
-<div class="page-container">
-	{#if loading}
+{#if loading}
+	<div class="page-container">
 		<LoadingSpinner />
-	{:else if error}
+	</div>
+{:else if error}
+	<div class="page-container">
 		<div class="text-center py-16">
 			<span class="i-lucide-alert-circle text-4xl text-red-400 mb-4 block mx-auto"></span>
-			<p class="text-gray-600 mb-4">{error}</p>
+			<p class="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
 			<a href="/documents" class="btn-primary no-underline">Back to Documents</a>
 		</div>
-	{:else if doc}
-		<!-- Header -->
-		<div class="mb-6">
-			<a href="/documents" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3 no-underline">
+	</div>
+{:else if doc}
+	<div class="flex h-[calc(100vh-4rem)]">
+		<!-- Left sidebar: metadata -->
+		<div class="w-sm flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-900">
+			<a href="/documents" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 no-underline">
 				<span class="i-lucide-arrow-left"></span>
 				Back to documents
 			</a>
 
-			<div class="flex items-start justify-between gap-4">
-				<div class="flex-1 min-w-0">
-					{#if editingName}
-						<div class="flex items-center gap-2">
-							<input
-								type="text"
-								class="input-base text-lg font-bold"
-								bind:value={editName}
-								onkeydown={handleNameKeydown}
-							/>
-							<button class="btn-primary btn-sm" onclick={saveName} disabled={saving}>Save</button>
-							<button class="btn-ghost btn-sm" onclick={cancelEditName}>Cancel</button>
-						</div>
-					{:else}
-						<div class="flex items-center gap-2 group">
-							<h1 class="text-2xl font-bold text-gray-900 truncate">{displayName}</h1>
-							<button
-								class="btn-icon opacity-0 group-hover:opacity-100"
-								title="Edit name"
-								onclick={startEditName}
-							>
-								<span class="i-lucide-pencil text-sm"></span>
-							</button>
-						</div>
-						{#if doc.ai_generated_name && doc.ai_generated_name !== doc.original_name}
-							<p class="text-sm text-gray-500 mt-1">Original: {doc.original_name}</p>
-						{/if}
+			<!-- Name -->
+			<div>
+				{#if editingName}
+					<div class="flex items-center gap-2">
+						<input
+							type="text"
+							class="input-base text-base font-bold flex-1"
+							bind:value={editName}
+							onkeydown={handleNameKeydown}
+						/>
+						<button class="btn-primary btn-sm" onclick={saveName} disabled={saving}>Save</button>
+						<button class="btn-ghost btn-sm" onclick={cancelEditName}>Cancel</button>
+					</div>
+				{:else}
+					<div class="flex items-center gap-1 group">
+						<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">{displayName}</h1>
+						<button
+							class="btn-icon opacity-0 group-hover:opacity-100 flex-shrink-0"
+							title="Edit name"
+							onclick={startEditName}
+						>
+							<span class="i-lucide-pencil text-sm"></span>
+						</button>
+					</div>
+					{#if doc.ai_generated_name && doc.ai_generated_name !== doc.original_name}
+						<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Original: {doc.original_name}</p>
 					{/if}
-				</div>
-
-				<div class="flex items-center gap-2 flex-shrink-0">
-					<a
-						href={getDownloadUrl(doc.id)}
-						class="btn-secondary no-underline"
-						download
-					>
-						<span class="i-lucide-download mr-1"></span>Download
-					</a>
-					<button
-						class="btn-secondary"
-						onclick={handleReprocess}
-						disabled={reprocessing}
-					>
-						<span class="i-lucide-refresh-cw mr-1 {reprocessing ? 'animate-spin' : ''}"></span>
-						Reprocess
-					</button>
-					<button
-						class="btn-danger"
-						onclick={() => (showDeleteDialog = true)}
-					>
-						<span class="i-lucide-trash-2 mr-1"></span>Delete
-					</button>
-				</div>
+				{/if}
 			</div>
-		</div>
 
-		<!-- Metadata -->
-		<div class="card p-6 mb-6">
-			<DocumentMeta document={doc} />
-		</div>
+			<!-- Actions -->
+			<div class="flex flex-wrap items-center gap-2">
+				<a
+					href={getDownloadUrl(doc.id)}
+					class="btn-secondary btn-sm no-underline"
+					download
+				>
+					<span class="i-lucide-download mr-1"></span>Download
+				</a>
+				<button
+					class="btn-secondary btn-sm"
+					onclick={handleReprocess}
+					disabled={reprocessing}
+				>
+					<span class="i-lucide-refresh-cw mr-1 {reprocessing ? 'animate-spin' : ''}"></span>
+					Reprocess
+				</button>
+				<button
+					class="btn-danger btn-sm"
+					onclick={() => (showDeleteDialog = true)}
+				>
+					<span class="i-lucide-trash-2 mr-1"></span>Delete
+				</button>
+			</div>
 
-		<!-- Tags -->
-		<div class="card p-6 mb-6">
-			<h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-1">
-				<span class="i-lucide-tags"></span>
-				Tags
-			</h3>
-			<TagInput tags={doc.tags} onchange={handleTagsChange} />
-		</div>
+			<!-- Bill Status -->
+			{#if isBill}
+				<div class="card p-4">
+					<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
+						<span class="i-lucide-receipt"></span>
+						Bill Info
+					</h3>
+					<div class="space-y-2 text-sm">
+						<div class="flex items-center justify-between">
+							<span class="text-gray-500 dark:text-gray-400">Status</span>
+							{#if doc.bill_status === 'unpaid'}
+								<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Unpaid</span>
+							{:else if doc.bill_status === 'paid'}
+								<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Paid</span>
+							{:else if doc.bill_status === 'dismissed'}
+								<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Dismissed</span>
+							{:else}
+								<span class="text-gray-400">—</span>
+							{/if}
+						</div>
+						{#if doc.bill_due_date}
+							<div class="flex items-center justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Due Date</span>
+								<span class="text-gray-900 dark:text-gray-100">{new Date(doc.bill_due_date).toLocaleDateString()}</span>
+							</div>
+						{/if}
+						{#if doc.bill_paid_at}
+							<div class="flex items-center justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Paid</span>
+								<span class="text-gray-900 dark:text-gray-100">{new Date(doc.bill_paid_at).toLocaleDateString()}</span>
+							</div>
+						{/if}
+					</div>
+					<div class="flex flex-wrap gap-2 mt-3">
+						{#if doc.bill_status === 'unpaid'}
+							<button class="btn-primary btn-sm" onclick={() => handleBillStatus('paid')} disabled={updatingBill}>
+								<span class="i-lucide-check mr-1"></span>Mark Paid
+							</button>
+							<button class="btn-ghost btn-sm" onclick={() => handleBillStatus('dismissed')} disabled={updatingBill}>
+								Not a Bill
+							</button>
+						{:else if doc.bill_status === 'paid' || doc.bill_status === 'dismissed'}
+							<button class="btn-secondary btn-sm" onclick={() => handleBillStatus('unpaid')} disabled={updatingBill}>
+								Mark Unpaid
+							</button>
+						{/if}
+					</div>
+				</div>
+			{/if}
 
-		<!-- Content text -->
-		{#if doc.content_text}
-			<div class="card p-6">
-				<h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-1">
-					<span class="i-lucide-text"></span>
-					Extracted Text
+			<!-- Metadata -->
+			<div class="card p-4">
+				<DocumentMeta document={doc} />
+			</div>
+
+			<!-- Tags -->
+			<div class="card p-4">
+				<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
+					<span class="i-lucide-tags"></span>
+					Tags
 				</h3>
-				<pre class="text-sm text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">{doc.content_text}</pre>
+				<TagInput tags={doc.tags} onchange={handleTagsChange} />
 			</div>
-		{/if}
 
-		<ConfirmDialog
-			open={showDeleteDialog}
-			title="Delete Document"
-			message="This will soft-delete the document. It won't appear in search results anymore. Are you sure?"
-			confirmLabel={deleting ? 'Deleting...' : 'Delete'}
-			onconfirm={handleDelete}
-			oncancel={() => (showDeleteDialog = false)}
-		/>
-	{/if}
-</div>
+			<!-- Content text -->
+			{#if doc.content_text}
+				<div class="card p-4">
+					<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
+						<span class="i-lucide-text"></span>
+						Extracted Text
+					</h3>
+					<pre class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">{doc.content_text}</pre>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Right: PDF viewer -->
+		<div class="flex-1 min-w-0">
+			<PdfPreview src={getDownloadUrl(doc.id)} />
+		</div>
+	</div>
+
+	<ConfirmDialog
+		open={showDeleteDialog}
+		title="Delete Document"
+		message="This will soft-delete the document. It won't appear in search results anymore. Are you sure?"
+		confirmLabel={deleting ? 'Deleting...' : 'Delete'}
+		onconfirm={handleDelete}
+		oncancel={() => (showDeleteDialog = false)}
+	/>
+{/if}

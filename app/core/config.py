@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     AI_BASE_URL: str = ""  # Custom base URL for OpenAI-compatible APIs (e.g. http://ollama:11434)
     AI_MAX_TEXT_LENGTH: int = 4000  # Max chars of document text sent to AI
     AI_TIMEOUT: int = 60  # Seconds to wait for AI response
+    AI_MAX_PAGES: int = 5  # Max PDF pages to send as images for vision analysis
+    AI_VISION_DPI: int = 150  # Render resolution for vision analysis
+    AI_VISION_MODEL: str = ""  # Vision model override (empty = use AI_MODEL)
 
 
 settings = Settings()

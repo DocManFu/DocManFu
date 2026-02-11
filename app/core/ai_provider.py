@@ -27,6 +27,7 @@ Analyze the provided document text and return a JSON object with these fields:
     "date": "<document date as YYYY-MM-DD or null>",
     "amount": "<monetary amount as string like '$123.45' or null>",
     "account_number": "<account/reference number or null>",
+    "due_date": "<payment due date as YYYY-MM-DD or null — only for bills/invoices>",
     "summary": "<one-sentence summary of the document>"
   },
   "confidence_score": <float 0.0 to 1.0 indicating analysis confidence>
@@ -46,11 +47,55 @@ Document types (pick the best fit):
 - other: none of the above
 
 Rules:
+- For bills and invoices, extract the payment due date as due_date. If no explicit due date, use null.
 - Return ONLY valid JSON, no markdown fencing, no extra text.
 - If a field cannot be determined, use null (for strings) or [] (for arrays).
 - The suggested_name should be human-readable and filesystem-safe (no special characters besides hyphens and underscores).
 - Tags should be simple lowercase words or short phrases (e.g. "utility", "bank", "medical", "tax", "quarterly").
 - confidence_score: 0.9+ for clear documents, 0.5-0.8 for partially readable, below 0.5 for unclear.
+"""
+
+
+VISION_SYSTEM_PROMPT = """\
+You are a document analysis assistant for a document management system.
+Analyze the provided page images of a document and return a JSON object with these fields:
+
+{
+  "document_type": "<MUST be exactly one of: bill, invoice, receipt, bank_statement, insurance, medical, tax, legal, correspondence, report, other>",
+  "suggested_name": "<descriptive human-readable filename WITHOUT extension, e.g. 'Comcast Internet Bill 2024-03-15' or 'Fountain Green City Newsletter Jan-Mar 2025'. Use natural title case with spaces. Put the date at the end.>",
+  "suggested_tags": ["<list of 2-5 relevant lowercase tags>"],
+  "extracted_metadata": {
+    "company": "<company/organization name or null>",
+    "date": "<document date as YYYY-MM-DD or null>",
+    "amount": "<monetary amount as string like '$123.45' or null>",
+    "account_number": "<account/reference number or null>",
+    "due_date": "<payment due date as YYYY-MM-DD or null — only for bills/invoices>",
+    "summary": "<one-sentence summary of the document>"
+  },
+  "confidence_score": <float 0.0 to 1.0 indicating analysis confidence>
+}
+
+Document types (pick the best fit):
+- bill: a request for payment (utility bill, phone bill, etc.)
+- invoice: an itemized bill from a vendor or contractor
+- receipt: proof of payment already made
+- bank_statement: bank or credit card account statement
+- insurance: anything from an insurance company — pre-auth approvals, EOBs, claims, coverage letters, policy documents
+- medical: medical records, lab results, prescriptions, doctor's notes (NOT insurance paperwork)
+- tax: tax returns, W-2s, 1099s, tax notices
+- legal: contracts, court documents, legal notices
+- correspondence: letters, newsletters, general communications
+- report: reports, analyses, summaries
+- other: none of the above
+
+Rules:
+- For bills and invoices, extract the payment due date as due_date. If no explicit due date, use null.
+- Return ONLY valid JSON, no markdown fencing, no extra text.
+- If a field cannot be determined, use null (for strings) or [] (for arrays).
+- The suggested_name should be human-readable and filesystem-safe (no special characters besides hyphens and underscores).
+- Tags should be simple lowercase words or short phrases (e.g. "utility", "bank", "medical", "tax", "quarterly").
+- confidence_score: 0.9+ for clear documents, 0.5-0.8 for partially readable, below 0.5 for unclear.
+- Examine the visual layout, tables, logos, and any text visible in the images.
 """
 
 
@@ -149,6 +194,93 @@ _PROVIDERS = {
 }
 
 
+# -- Vision provider implementations --------------------------------------
+
+
+def _call_openai_vision(images: list[str], original_filename: str) -> str:
+    """Call OpenAI with vision content blocks."""
+    from openai import OpenAI
+
+    client = OpenAI(api_key=settings.AI_API_KEY, timeout=settings.AI_TIMEOUT)
+    model = settings.AI_VISION_MODEL or settings.AI_MODEL or "gpt-4o"
+
+    content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
+    for img_b64 in images:
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{img_b64}", "detail": "high"},
+        })
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": VISION_SYSTEM_PROMPT},
+            {"role": "user", "content": content},
+        ],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    return response.choices[0].message.content
+
+
+def _call_anthropic_vision(images: list[str], original_filename: str) -> str:
+    """Call Anthropic with image content blocks."""
+    from anthropic import Anthropic
+
+    client = Anthropic(api_key=settings.AI_API_KEY, timeout=settings.AI_TIMEOUT)
+    model = settings.AI_VISION_MODEL or settings.AI_MODEL or "claude-sonnet-4-5-20250929"
+
+    content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
+    for img_b64 in images:
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/png", "data": img_b64},
+        })
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=1024,
+        system=VISION_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": content}],
+        temperature=0.2,
+    )
+    return response.content[0].text
+
+
+def _call_ollama_vision(images: list[str], original_filename: str) -> str:
+    """Call Ollama vision model via OpenAI-compatible API."""
+    from openai import OpenAI
+
+    base_url = settings.AI_BASE_URL.rstrip("/") + "/v1" if settings.AI_BASE_URL else "http://localhost:11434/v1"
+    client = OpenAI(api_key="ollama", base_url=base_url, timeout=settings.AI_TIMEOUT)
+    model = settings.AI_VISION_MODEL or settings.AI_MODEL or "granite3.2-vision"
+
+    content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
+    for img_b64 in images:
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{img_b64}", "detail": "high"},
+        })
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": VISION_SYSTEM_PROMPT},
+            {"role": "user", "content": content},
+        ],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    return response.choices[0].message.content
+
+
+_VISION_PROVIDERS = {
+    "openai": _call_openai_vision,
+    "anthropic": _call_anthropic_vision,
+    "ollama": _call_ollama_vision,
+}
+
+
 # -- Parse AI response ----------------------------------------------------
 
 
@@ -241,7 +373,8 @@ def analyze_document(text: str, original_filename: str) -> AIAnalysisResult:
     if call_fn is None:
         raise ValueError(f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_PROVIDERS)}")
 
-    logger.info("Calling AI provider '%s' (model: %s) for '%s'", provider, settings.AI_MODEL, original_filename)
+    model = settings.AI_MODEL or "(default)"
+    logger.info("Calling AI provider '%s' (model: %s) for '%s'", provider, model, original_filename)
 
     raw_response = call_fn(text, original_filename)
     logger.debug("Raw AI response: %s", raw_response[:500])
@@ -249,6 +382,51 @@ def analyze_document(text: str, original_filename: str) -> AIAnalysisResult:
     result = _parse_response(raw_response)
     logger.info(
         "AI analysis complete: type=%s, name=%s, confidence=%.2f",
+        result.document_type,
+        result.suggested_name,
+        result.confidence_score,
+    )
+    return result
+
+
+def analyze_document_vision(images: list[str], original_filename: str) -> AIAnalysisResult:
+    """Analyze document page images using the configured AI provider's vision model.
+
+    Args:
+        images: List of base64-encoded PNG strings (one per page).
+        original_filename: The original uploaded filename.
+
+    Returns:
+        AIAnalysisResult with classification, naming, and metadata.
+
+    Raises:
+        ValueError: If AI_PROVIDER is "none" or not configured.
+        RuntimeError: If the AI call or response parsing fails.
+    """
+    provider = settings.AI_PROVIDER.lower()
+
+    if provider == "none" or not provider:
+        raise ValueError("AI_PROVIDER is set to 'none' — AI analysis is disabled")
+
+    if provider != "ollama" and not settings.AI_API_KEY:
+        raise ValueError(f"AI_API_KEY is not set for provider '{provider}'")
+
+    call_fn = _VISION_PROVIDERS.get(provider)
+    if call_fn is None:
+        raise ValueError(f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_VISION_PROVIDERS)}")
+
+    vision_model = settings.AI_VISION_MODEL or settings.AI_MODEL or "(default)"
+    logger.info(
+        "Calling AI provider '%s' vision (model: %s) for '%s' (%d pages)",
+        provider, vision_model, original_filename, len(images),
+    )
+
+    raw_response = call_fn(images, original_filename)
+    logger.debug("Raw AI vision response: %s", raw_response[:500])
+
+    result = _parse_response(raw_response)
+    logger.info(
+        "AI vision analysis complete: type=%s, name=%s, confidence=%.2f",
         result.document_type,
         result.suggested_name,
         result.confidence_score,

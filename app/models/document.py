@@ -1,9 +1,9 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import BigInteger, DateTime, String, Text
-from sqlalchemy.dialects.postgresql import JSON, UUID
+from sqlalchemy import BigInteger, Date, DateTime, String, Text
+from sqlalchemy.dialects.postgresql import JSON, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, UUIDMixin, TimestampMixin
@@ -33,6 +33,16 @@ class Document(UUIDMixin, TimestampMixin, Base):
     )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    bill_status: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True, index=True
+    )
+    bill_paid_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    bill_due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    search_vector: Mapped[Optional[str]] = mapped_column(
+        TSVECTOR, nullable=True
     )
 
     tags: Mapped[list["Tag"]] = relationship(

@@ -121,6 +121,11 @@ def process_ocr(self, job_id: str, document_id: str):
         document.processed_date = datetime.now(timezone.utc)
         db.commit()
 
+        # Update search vector
+        from app.core.search import update_search_vector
+
+        update_search_vector(db, document_id)
+
         # Count pages for result data
         page_count = _count_pdf_pages(input_path)
 
@@ -140,7 +145,7 @@ def process_ocr(self, job_id: str, document_id: str):
         )
 
         # --- Chain: dispatch AI analysis if provider is configured ---
-        if extracted_text and settings.AI_PROVIDER.lower() not in ("none", ""):
+        if settings.AI_PROVIDER.lower() not in ("none", ""):
             _dispatch_ai_analysis(db, document_id)
 
     except Exception:

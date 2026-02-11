@@ -26,5 +26,8 @@
 		"typescript": "^5.9.3",
 		"unocss": "^66.6.0",
 		"vite": "^7.3.1"
+	},
+	"dependencies": {
+		"pdfjs-dist": "^5.4.624"
 	}
 }

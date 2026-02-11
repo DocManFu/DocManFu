@@ -4,10 +4,14 @@
 	import Navbar from '$lib/components/layout/Navbar.svelte';
 	import ToastContainer from '$lib/components/shared/ToastContainer.svelte';
 	import JobTracker from '$lib/components/jobs/JobTracker.svelte';
+	import KeyboardShortcuts from '$lib/components/shared/KeyboardShortcuts.svelte';
+	import ShortcutsHelp from '$lib/components/shared/ShortcutsHelp.svelte';
 	import type { Snippet } from 'svelte';
 
 	let { children }: { children: Snippet } = $props();
 </script>
+
+<KeyboardShortcuts />
 
 <div class="min-h-screen flex flex-col">
 	<Navbar />
@@ -16,4 +20,5 @@
 	</main>
 	<ToastContainer />
 	<JobTracker />
+	<ShortcutsHelp />
 </div>
