@@ -19,8 +19,8 @@ You are a document analysis assistant for a document management system.
 Analyze the provided document text and return a JSON object with these fields:
 
 {
-  "document_type": "<one of: bill, bank_statement, medical, insurance, tax, invoice, receipt, legal, correspondence, report, other>",
-  "suggested_name": "<descriptive filename WITHOUT extension, using format: YYYY-MM-DD_Company_DocumentType, e.g. 2024-03-15_Comcast_Internet_Bill>",
+  "document_type": "<MUST be exactly one of: bill, invoice, receipt, bank_statement, insurance, medical, tax, legal, correspondence, report, other>",
+  "suggested_name": "<descriptive human-readable filename WITHOUT extension, e.g. 'Comcast Internet Bill 2024-03-15' or 'Fountain Green City Newsletter Jan-Mar 2025'. Use natural title case with spaces. Put the date at the end.>",
   "suggested_tags": ["<list of 2-5 relevant lowercase tags>"],
   "extracted_metadata": {
     "company": "<company/organization name or null>",
@@ -31,6 +31,19 @@ Analyze the provided document text and return a JSON object with these fields:
   },
   "confidence_score": <float 0.0 to 1.0 indicating analysis confidence>
 }
+
+Document types (pick the best fit):
+- bill: a request for payment (utility bill, phone bill, etc.)
+- invoice: an itemized bill from a vendor or contractor
+- receipt: proof of payment already made
+- bank_statement: bank or credit card account statement
+- insurance: anything from an insurance company — pre-auth approvals, EOBs, claims, coverage letters, policy documents
+- medical: medical records, lab results, prescriptions, doctor's notes (NOT insurance paperwork)
+- tax: tax returns, W-2s, 1099s, tax notices
+- legal: contracts, court documents, legal notices
+- correspondence: letters, newsletters, general communications
+- report: reports, analyses, summaries
+- other: none of the above
 
 Rules:
 - Return ONLY valid JSON, no markdown fencing, no extra text.
@@ -109,13 +122,73 @@ def _call_anthropic(text: str, original_filename: str) -> str:
     return response.content[0].text
 
 
+def _call_ollama(text: str, original_filename: str) -> str:
+    """Call Ollama via its OpenAI-compatible API and return the raw response text."""
+    from openai import OpenAI
+
+    base_url = settings.AI_BASE_URL.rstrip("/") + "/v1" if settings.AI_BASE_URL else "http://localhost:11434/v1"
+    client = OpenAI(api_key="ollama", base_url=base_url, timeout=settings.AI_TIMEOUT)
+    model = settings.AI_MODEL or "llama3.2"
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": _build_user_message(text, original_filename)},
+        ],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    return response.choices[0].message.content
+
+
 _PROVIDERS = {
     "openai": _call_openai,
     "anthropic": _call_anthropic,
+    "ollama": _call_ollama,
 }
 
 
 # -- Parse AI response ----------------------------------------------------
+
+
+_VALID_DOCUMENT_TYPES = {
+    "bill", "invoice", "receipt", "bank_statement", "insurance",
+    "medical", "tax", "legal", "correspondence", "report", "other",
+}
+
+# Maps common AI-generated type variations to valid types
+_DOCUMENT_TYPE_ALIASES = {
+    "pre-auth letter": "insurance",
+    "pre-auth": "insurance",
+    "preauth": "insurance",
+    "eob": "insurance",
+    "explanation of benefits": "insurance",
+    "claim": "insurance",
+    "coverage": "insurance",
+    "policy": "insurance",
+    "statement": "bank_statement",
+    "contract": "legal",
+    "letter": "correspondence",
+    "newsletter": "correspondence",
+}
+
+
+def _normalize_document_type(raw_type: str | None) -> str:
+    """Coerce AI-generated document type to a valid enum value."""
+    if not raw_type:
+        return "other"
+    normalized = raw_type.strip().lower()
+    if normalized in _VALID_DOCUMENT_TYPES:
+        return normalized
+    if normalized in _DOCUMENT_TYPE_ALIASES:
+        return _DOCUMENT_TYPE_ALIASES[normalized]
+    # Try substring matching as fallback
+    for alias, valid_type in _DOCUMENT_TYPE_ALIASES.items():
+        if alias in normalized or normalized in alias:
+            return valid_type
+    logger.warning("Unknown document_type '%s', defaulting to 'other'", raw_type)
+    return "other"
 
 
 def _parse_response(raw: str) -> AIAnalysisResult:
@@ -132,7 +205,7 @@ def _parse_response(raw: str) -> AIAnalysisResult:
 
     return AIAnalysisResult(
         suggested_name=data.get("suggested_name"),
-        document_type=data.get("document_type"),
+        document_type=_normalize_document_type(data.get("document_type")),
         suggested_tags=data.get("suggested_tags") or [],
         extracted_metadata=data.get("extracted_metadata") or {},
         confidence_score=float(data.get("confidence_score", 0.0)),
@@ -161,7 +234,7 @@ def analyze_document(text: str, original_filename: str) -> AIAnalysisResult:
     if provider == "none" or not provider:
         raise ValueError("AI_PROVIDER is set to 'none' — AI analysis is disabled")
 
-    if not settings.AI_API_KEY:
+    if provider != "ollama" and not settings.AI_API_KEY:
         raise ValueError(f"AI_API_KEY is not set for provider '{provider}'")
 
     call_fn = _PROVIDERS.get(provider)

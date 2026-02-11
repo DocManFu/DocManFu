@@ -291,7 +291,7 @@ When you're done, update CLAUDE.md with information that will be useful for you 
 
 ```
 Add advanced search capabilities:
-- Full-text search with PostgreSQL or Elasticsearch
+- Full-text search with PostgreSQL
 - Advanced filtering (date ranges, document types, tags)
 - Search result highlighting
 - Saved searches/bookmarks

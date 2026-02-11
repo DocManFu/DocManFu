@@ -10,7 +10,7 @@ Self-hosted AI-powered document management system (Evernote replacement). Python
 - **Frontend**: Svelte — **NO JSX, ever**
 - **Queue**: Celery + Redis
 - **OCR**: ocrmypdf
-- **AI**: Configurable providers (OpenAI, Anthropic, local)
+- **AI**: Configurable providers (OpenAI, Anthropic, Ollama/local)
 - **Config**: pydantic-settings reading from `.env`
 
 ## Project Structure
@@ -30,7 +30,7 @@ app/
     base.py             # DocManFuTask base class with DB job tracking
     ocr.py              # OCR processing task (ocrmypdf + pdfminer text extraction)
     ai_analysis.py      # AI analysis task (classifies docs, suggests names/tags)
-  core/ai_provider.py   # AI provider abstraction (OpenAI, Anthropic)
+  core/ai_provider.py   # AI provider abstraction (OpenAI, Anthropic, Ollama)
     file_organization.py # File org task (stub — future session)
   core/celery_app.py    # Celery app instance and configuration
 alembic/                # Migrations
@@ -65,9 +65,10 @@ scripts/
 - `OCR_DPI` is the resolution for rasterizing image-only pages during OCR (default: `300`)
 - `OCR_SKIP_TEXT` skips OCR on pages that already contain text (default: `true`)
 - `OCR_CLEAN` removes intermediate files after OCR processing (default: `true`)
-- `AI_PROVIDER` selects the AI backend: `"openai"`, `"anthropic"`, or `"none"` to disable (default: `none`)
-- `AI_API_KEY` is the API key for the selected AI provider (required when AI_PROVIDER is not "none")
-- `AI_MODEL` overrides the default model name (defaults: `gpt-4o-mini` for OpenAI, `claude-sonnet-4-5-20250929` for Anthropic)
+- `AI_PROVIDER` selects the AI backend: `"openai"`, `"anthropic"`, `"ollama"`, or `"none"` to disable (default: `none`)
+- `AI_API_KEY` is the API key for the selected AI provider (required when AI_PROVIDER is not "none" or "ollama")
+- `AI_MODEL` overrides the default model name (defaults: `gpt-4o-mini` for OpenAI, `claude-sonnet-4-5-20250929` for Anthropic, `llama3.2` for Ollama)
+- `AI_BASE_URL` overrides the API base URL for OpenAI-compatible endpoints (used by Ollama provider, e.g. `http://ollama:11434`)
 - `AI_MAX_TEXT_LENGTH` caps document text sent to the AI to control costs (default: `4000` chars)
 - `AI_TIMEOUT` is the max seconds to wait for an AI API response (default: `60`)
 
@@ -117,17 +118,18 @@ scripts/
 
 ### AI Analysis Pipeline (`app/tasks/ai_analysis.py` + `app/core/ai_provider.py`)
 - Automatically dispatched after OCR completes (when `AI_PROVIDER != "none"` and text was extracted)
-- **Provider module** (`app/core/ai_provider.py`): abstraction over OpenAI and Anthropic with a common `analyze_document()` function
+- **Provider module** (`app/core/ai_provider.py`): abstraction over OpenAI, Anthropic, and Ollama with a common `analyze_document()` function
 - Provider SDKs imported lazily inside the call functions so they aren't required at import time
 - Prompt asks AI to return a JSON object with: `document_type`, `suggested_name`, `suggested_tags`, `extracted_metadata`, `confidence_score`
 - Supported document types: bill, bank_statement, medical, insurance, tax, invoice, receipt, legal, correspondence, report, other
-- `suggested_name` format: `YYYY-MM-DD_Company_DocumentType` (no extension)
+- `suggested_name` format: natural title case with date at end, e.g. `Fountain Green City Newsletter Jan-Mar 2025` (no extension)
 - `extracted_metadata` includes: company, date, amount, account_number, summary
 - Task updates `Document.ai_generated_name`, `Document.document_type`, and `Document.ai_metadata` (JSON)
 - Auto-creates `Tag` records for suggested tags (default color `#6B7280`) and associates them with the document
 - `ValueError` from provider (missing config/key) marks job as failed without retrying; other exceptions trigger normal retry logic
 - Result data in ProcessingJob includes: `document_id`, `suggested_name`, `document_type`, `suggested_tags`, `extracted_metadata`, `confidence_score`
-- OpenAI uses `response_format={"type": "json_object"}` for structured output; Anthropic relies on prompt instructions
+- OpenAI and Ollama use `response_format={"type": "json_object"}` for structured output; Anthropic relies on prompt instructions
+- Ollama provider reuses the OpenAI SDK with a custom `base_url` and dummy API key — no new dependencies needed
 - Document text is truncated to `AI_MAX_TEXT_LENGTH` characters before sending to the AI
 
 ### Migrations
@@ -140,6 +142,28 @@ scripts/
 - Dependencies in `requirements.txt` — install with `pip install -r requirements.txt`
 
 ## Development Commands
+
+### Docker (recommended)
+```bash
+./dev                     # Start all services (attached)
+./dev up -d               # Start all services (detached)
+./dev down                # Stop and remove containers
+./dev restart [-d]        # Restart all containers
+./dev rebuild [-d]        # Full rebuild with --no-cache
+./dev build               # Build images without starting
+./dev logs [service]      # Follow logs (optionally for one service)
+./dev ps                  # Show container status
+./dev shell [service]     # Open shell in container (default: api)
+./dev clean               # Stop containers and remove volumes (with confirmation)
+./dev migrate             # Run alembic upgrade head in api container
+./dev seed                # Run seed_data.py in api container
+```
+
+Services: `api` (port 8100), `worker`, `frontend` (port 5180), `db` (port 5450), `redis` (port 6390)
+
+Ollama runs natively on the host (GPU-accelerated) — Docker containers connect via `host.docker.internal:11434`. Install: `brew install ollama && ollama serve`, then `ollama pull llama3.2`.
+
+### Local (without Docker)
 ```bash
 source venv/bin/activate              # Activate venv
 pip install -r requirements.txt       # Install deps

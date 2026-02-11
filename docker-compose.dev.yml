@@ -1,0 +1,98 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: docmanfu
+      POSTGRES_PASSWORD: docmanfu
+      POSTGRES_DB: docmanfu
+    ports:
+      - "5450:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docmanfu"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6390:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8100:8000"
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./scripts:/app/scripts
+      - uploads:/app/uploads
+    environment:
+      DATABASE_URL: postgresql://docmanfu:docmanfu@db:5432/docmanfu
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: '["http://localhost:5180"]'
+      LOG_LEVEL: INFO
+      UPLOAD_DIR: uploads
+      AI_PROVIDER: ollama
+      AI_BASE_URL: http://host.docker.internal:11434
+      AI_MODEL: llama3.2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./app:/app/app
+      - uploads:/app/uploads
+    environment:
+      DATABASE_URL: postgresql://docmanfu:docmanfu@db:5432/docmanfu
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_DIR: uploads
+      AI_PROVIDER: ollama
+      AI_BASE_URL: http://host.docker.internal:11434
+      AI_MODEL: llama3.2
+      AI_TIMEOUT: 120
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: watchfiles --filter python "celery -A app.core.celery_app:celery_app worker --loglevel=info" ./app
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    ports:
+      - "5180:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      API_TARGET: http://api:8000
+    depends_on:
+      - api
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+  frontend_node_modules:

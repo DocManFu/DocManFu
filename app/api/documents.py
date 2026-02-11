@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -334,10 +335,13 @@ def download_document(document_id: UUID, db: Session = Depends(get_db)):
     if not abs_path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
 
-    # Prefer AI-generated name for download filename
-    download_name = doc.original_name
-    if doc.ai_generated_name:
-        download_name = f"{doc.ai_generated_name}.pdf"
+    # Use AI name or user-edited name, slugified, with original extension
+    display_name = doc.ai_generated_name or doc.original_name
+    ext = Path(doc.original_name).suffix or ".pdf"
+    stem = Path(display_name).stem
+    slug = re.sub(r"[^\w\s-]", "", stem.lower()).strip()
+    slug = re.sub(r"[\s]+", "_", slug)
+    download_name = f"{slug}{ext}" if slug else doc.original_name
 
     return FileResponse(
         path=str(abs_path),

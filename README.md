@@ -41,7 +41,35 @@ DocManFu is an open-source document management system that combines:
 
 ## 🚀 Quick Start
 
-*Coming soon - currently in development*
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+
+### Running with Docker
+
+```bash
+# Start all services (attached)
+./dev
+
+# Start in background
+./dev up -d
+
+# Run database migrations
+./dev migrate
+
+# Load sample data
+./dev seed
+
+# View logs
+./dev logs
+
+# Stop everything
+./dev down
+```
+
+This starts PostgreSQL (port 5450), Redis (port 6390), the FastAPI API (port 8100), Celery worker, and Svelte frontend (port 5180) with hot-reload enabled.
+
+Run `./dev --help` for all available commands.
 
 ## 📋 Roadmap
 
