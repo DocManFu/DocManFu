@@ -43,13 +43,26 @@ scripts/
 frontend/
   Dockerfile            # Production frontend image (node build + nginx)
   nginx.conf            # SPA routing + /api proxy + SSE support
+  .prettierrc           # Prettier config for Svelte/TS formatting
 Dockerfile              # Production backend image (multi-stage, non-root)
 docker-compose.yml      # Production compose (db, redis, migrate, api, worker, frontend)
 docker-compose.dev.yml  # Development compose
 dev                     # Development CLI wrapper
 prod                    # Production CLI wrapper
+pyproject.toml          # black, ruff, pytest configuration
+.pre-commit-config.yaml # Pre-commit hooks (black, ruff, prettier)
+requirements-dev.txt    # Dev dependencies (black, ruff, pytest, pre-commit)
 docs/
   DEPLOYMENT.md         # Full deployment guide
+  ARCHITECTURE.md       # System architecture and data flow
+CONTRIBUTING.md         # Contributor guidelines
+SECURITY.md             # Security policy and vulnerability reporting
+.github/
+  ISSUE_TEMPLATE/       # Bug report and feature request templates
+  PULL_REQUEST_TEMPLATE.md
+  workflows/
+    ci.yml              # CI: lint, test, build checks
+    docker-publish.yml  # Publish Docker images to GHCR on release
 ```
 
 ## Key Conventions
@@ -179,11 +192,24 @@ Ollama runs natively on the host (GPU-accelerated) — Docker containers connect
 ```bash
 source venv/bin/activate              # Activate venv
 pip install -r requirements.txt       # Install deps
+pip install -r requirements-dev.txt   # Install dev deps (linting, testing)
 uvicorn app.main:app --reload         # Run dev server (http://localhost:8000)
 celery -A app.core.celery_app:celery_app worker --loglevel=info  # Run Celery worker
 alembic upgrade head                  # Run migrations
 alembic revision -m "description"     # Create new migration
 python scripts/seed_data.py           # Load sample data
+```
+
+### Formatting & Linting
+```bash
+black app/                            # Format Python code
+black --check app/                    # Check Python formatting
+ruff check app/                       # Lint Python code
+ruff check app/ --fix                 # Auto-fix lint issues
+cd frontend && npx prettier --check "src/**/*.{svelte,ts,js,css,html}"  # Check frontend formatting
+cd frontend && npx prettier --write "src/**/*.{svelte,ts,js,css,html}"  # Fix frontend formatting
+pre-commit install                    # Install pre-commit hooks
+pre-commit run --all-files            # Run all hooks manually
 ```
 
 ### Production Docker

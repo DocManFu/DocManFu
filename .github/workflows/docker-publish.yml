@@ -1,0 +1,54 @@
+name: Publish Docker Images
+
+on:
+  release:
+    types: [published]
+  push:
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE: ghcr.io/${{ github.repository }}/api
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+
+jobs:
+  build-and-push:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version tag
+        id: meta
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.version }}
+            ${{ env.API_IMAGE }}:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.version }}
+            ${{ env.FRONTEND_IMAGE }}:latest
