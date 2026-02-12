@@ -124,11 +124,11 @@ if [[ -n "$DEPLOY_PROFILE" ]]; then
 fi
 
 if [[ ${#SERVICES[@]} -gt 0 ]]; then
-    info "Rebuilding ${SERVICES[*]}..."
-    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS up -d --build ${SERVICES[*]}"
+    info "Building ${SERVICES[*]}..."
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS build ${SERVICES[*]} && docker compose $PROFILE_ARGS up -d ${SERVICES[*]}"
 else
-    info "Rebuilding all services..."
-    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS up -d --build"
+    info "Building all services..."
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS build && docker compose $PROFILE_ARGS up -d"
 fi
 
 ok "Deploy complete"
