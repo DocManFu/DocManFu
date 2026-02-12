@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 app.add_middleware(
