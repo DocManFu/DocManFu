@@ -70,7 +70,7 @@ services:
       DATABASE_URL: postgresql://docmanfu:${POSTGRES_PASSWORD:?}@db:5432/docmanfu
       REDIS_URL: redis://redis:6379/0
     volumes:
-      - uploads:/app/uploads
+      - ${UPLOAD_PATH:-./uploads}:/app/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -100,7 +100,7 @@ services:
       DATABASE_URL: postgresql://docmanfu:${POSTGRES_PASSWORD:?}@db:5432/docmanfu
       REDIS_URL: redis://redis:6379/0
     volumes:
-      - uploads:/app/uploads
+      - ${UPLOAD_PATH:-./uploads}:/app/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -182,5 +182,4 @@ services:
 volumes:
   pgdata:
   redisdata:
-  uploads:
   ollama_models:

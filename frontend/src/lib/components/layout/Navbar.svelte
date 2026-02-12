@@ -9,6 +9,7 @@
 		{ href: '/bills', label: 'Bills', icon: 'i-lucide-receipt' },
 		{ href: '/upload', label: 'Upload', icon: 'i-lucide-upload' },
 		{ href: '/search', label: 'Search', icon: 'i-lucide-search' },
+		{ href: '/jobs', label: 'Jobs', icon: 'i-lucide-activity' },
 		{ href: '/tags', label: 'Tags', icon: 'i-lucide-tags' }
 	];
 

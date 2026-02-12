@@ -130,6 +130,9 @@ class DocManFuTask(Task):
             job = db.get(ProcessingJob, job_id)
             if job is None:
                 return
+            # Skip if already failed (e.g. cancelled by user) to avoid overwriting
+            if job.status == JobStatus.failed:
+                return
             job.status = JobStatus.failed
             job.error_message = error_message
             job.completed_at = datetime.now(timezone.utc)

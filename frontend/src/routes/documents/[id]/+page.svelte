@@ -456,6 +456,18 @@
 								</button>
 							{/if}
 						</div>
+						{#if doc.ai_metadata?.payment_url}
+							{@const rawUrl = doc.ai_metadata.payment_url}
+							{@const payUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`}
+							<div class="flex items-center justify-between">
+								<span class="text-gray-500 dark:text-gray-400">Pay Online</span>
+								<a href={payUrl} target="_blank" rel="noopener noreferrer"
+									class="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm inline-flex items-center gap-1">
+									{(() => { try { return new URL(payUrl).hostname; } catch { return rawUrl; } })()}
+									<span class="i-lucide-external-link text-xs"></span>
+								</a>
+							</div>
+						{/if}
 						{#if doc.bill_paid_at}
 							<div class="flex items-center justify-between">
 								<span class="text-gray-500 dark:text-gray-400">Paid</span>

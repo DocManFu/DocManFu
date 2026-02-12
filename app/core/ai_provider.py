@@ -20,7 +20,7 @@ Analyze the provided document text and return a JSON object with these fields:
 
 {
   "document_type": "<MUST be exactly one of: bill, invoice, receipt, bank_statement, insurance, medical, tax, legal, correspondence, report, other>",
-  "suggested_name": "<descriptive human-readable filename WITHOUT extension. Use natural title case with spaces. Put the date at the end.>",
+  "suggested_name": "<descriptive human-readable filename WITHOUT extension or date. Use natural title case with spaces. Do NOT include dates — the date is stored separately in metadata.>",
   "suggested_tags": ["<list of 2-5 relevant lowercase tags>"],
   "extracted_metadata": {
     "company": "<company/organization name or null>",
@@ -28,6 +28,7 @@ Analyze the provided document text and return a JSON object with these fields:
     "amount": "<monetary amount as string like '$123.45' or null>",
     "account_number": "<account/reference number or null>",
     "due_date": "<payment due date as YYYY-MM-DD or null — only for bills/invoices>",
+    "payment_url": "<payment URL found in the document or null — only for bills/invoices>",
     "summary": "<one-sentence summary of the document>"
   },
   "confidence_score": <float 0.0 to 1.0 indicating analysis confidence>
@@ -50,9 +51,10 @@ IMPORTANT: The key distinction for "bill" vs other types is whether the document
 
 Rules:
 - CRITICAL: Only use company names, dates, amounts, and other details that appear VERBATIM in the document text. NEVER guess or infer entity names that are not explicitly written in the document.
-- The suggested_name MUST be based solely on information found in the document text. Use the company/organization name exactly as it appears. If no company name is clearly present, use a generic description (e.g. "Escrow Refund Check 2025-12-26" not "Comcast Internet Bill 2025-12-26").
+- The suggested_name MUST be based solely on information found in the document text. Use the company/organization name exactly as it appears. If no company name is clearly present, use a generic description (e.g. "Escrow Refund Check" not "Comcast Internet Bill"). Do NOT include dates in the name.
 - If the OCR text is garbled or unclear, lower your confidence_score accordingly and use only the parts you can read with certainty.
 - For bills and invoices, extract the payment due date as due_date. If no explicit due date, use null.
+- For bills and invoices, look for payment URLs (e.g. pay.xfinity.com, online payment portals). Extract the full URL if found, otherwise use null.
 - Return ONLY valid JSON, no markdown fencing, no extra text.
 - If a field cannot be determined, use null (for strings) or [] (for arrays).
 - The suggested_name should be human-readable and filesystem-safe (no special characters besides hyphens and underscores).
@@ -67,7 +69,7 @@ Analyze the provided page images of a document and return a JSON object with the
 
 {
   "document_type": "<MUST be exactly one of: bill, invoice, receipt, bank_statement, insurance, medical, tax, legal, correspondence, report, other>",
-  "suggested_name": "<descriptive human-readable filename WITHOUT extension. Use natural title case with spaces. Put the date at the end.>",
+  "suggested_name": "<descriptive human-readable filename WITHOUT extension or date. Use natural title case with spaces. Do NOT include dates — the date is stored separately in metadata.>",
   "suggested_tags": ["<list of 2-5 relevant lowercase tags>"],
   "extracted_metadata": {
     "company": "<company/organization name or null>",
@@ -75,6 +77,7 @@ Analyze the provided page images of a document and return a JSON object with the
     "amount": "<monetary amount as string like '$123.45' or null>",
     "account_number": "<account/reference number or null>",
     "due_date": "<payment due date as YYYY-MM-DD or null — only for bills/invoices>",
+    "payment_url": "<payment URL found in the document or null — only for bills/invoices>",
     "summary": "<one-sentence summary of the document>"
   },
   "confidence_score": <float 0.0 to 1.0 indicating analysis confidence>
@@ -97,10 +100,11 @@ IMPORTANT: The key distinction for "bill" vs other types is whether the document
 
 Rules:
 - CRITICAL: Only use company names, dates, amounts, and other details that are VISIBLE in the document images. NEVER guess or infer entity names that do not appear in the document.
-- The suggested_name MUST be based solely on information found in the document. Use the company/organization name exactly as it appears. If no company name is clearly visible, use a generic description (e.g. "Escrow Refund Check 2025-12-26" not "Comcast Internet Bill 2025-12-26").
+- The suggested_name MUST be based solely on information found in the document. Use the company/organization name exactly as it appears. If no company name is clearly visible, use a generic description (e.g. "Escrow Refund Check" not "Comcast Internet Bill"). Do NOT include dates in the name.
 - If parts of the document are blurry or hard to read, lower your confidence_score accordingly and use only the parts you can read with certainty.
 - Examine the visual layout, tables, logos, and any text visible in the images.
 - For bills and invoices, extract the payment due date as due_date. If no explicit due date, use null.
+- For bills and invoices, look for payment URLs (e.g. pay.xfinity.com, online payment portals). Extract the full URL if found, otherwise use null.
 - Return ONLY valid JSON, no markdown fencing, no extra text.
 - If a field cannot be determined, use null (for strings) or [] (for arrays).
 - The suggested_name should be human-readable and filesystem-safe (no special characters besides hyphens and underscores).

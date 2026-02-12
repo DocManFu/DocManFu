@@ -25,7 +25,7 @@ app/
   api/                  # FastAPI routers
     health.py           # GET /health — app + DB status check
     documents.py        # Document CRUD, search, upload, download, reprocess
-    jobs.py             # GET /api/jobs/{job_id}/status — job progress tracking
+    jobs.py             # Job list, status, cancel, and per-document job history
   tasks/                # Celery background tasks
     base.py             # DocManFuTask base class with DB job tracking
     ocr.py              # OCR processing task (ocrmypdf + pdfminer text extraction)
@@ -112,7 +112,9 @@ SECURITY.md             # Security policy and vulnerability reporting
 - **GET /api/documents/{id}/download** — streams the PDF file via `FileResponse`. Uses `ai_generated_name.pdf` as download filename when available, otherwise `original_name`. 404 if file missing from disk.
 - **POST /api/documents/{id}/reprocess** — creates new OCR job and dispatches Celery task. AI analysis auto-follows OCR when `AI_PROVIDER` is configured. 404 if file missing from disk. Returns list of created jobs.
 - **POST /api/documents/upload** — accepts PDF `UploadFile`, validates extension + MIME type, stores in `{UPLOAD_DIR}/YYYY/MM/DD/{uuid}.pdf`, creates `Document` DB record, creates OCR `ProcessingJob`, and dispatches Celery task. Returns 400 for non-PDF, 413 for oversized files. Response includes `job_id` for tracking.
+- **GET /api/jobs** — list all processing jobs with pagination (offset/limit, max 100), filtering (status, job_type), and sorting (created_at asc|desc). Returns `JobListResponse` with `jobs`, `total`, `offset`, `limit`. Each job includes `document_name`. Admin sees all jobs; non-admin sees only their own.
 - **GET /api/jobs/{job_id}/status** — returns job status, progress (0-100), error_message, and result_data
+- **POST /api/jobs/{job_id}/cancel** — cancel a pending or processing job. Revokes the Celery task and marks the job as failed with "Cancelled by user". Returns 400 if job is already completed/failed.
 - Route ordering in `documents.py`: `/search` and `/upload` are defined **before** `/{document_id}` to prevent FastAPI from parsing path literals as UUIDs
 - List/search queries use `selectinload(Document.tags)` to eagerly load tags without affecting pagination counts
 - Pydantic response models use `model_config = {"from_attributes": True}` for ORM-to-schema conversion
@@ -147,8 +149,8 @@ SECURITY.md             # Security policy and vulnerability reporting
 - Provider SDKs imported lazily inside the call functions so they aren't required at import time
 - Prompt asks AI to return a JSON object with: `document_type`, `suggested_name`, `suggested_tags`, `extracted_metadata`, `confidence_score`
 - Supported document types: bill, bank_statement, medical, insurance, tax, invoice, receipt, legal, correspondence, report, other
-- `suggested_name` format: natural title case with date at end, e.g. `Fountain Green City Newsletter Jan-Mar 2025` (no extension)
-- `extracted_metadata` includes: company, date, amount, account_number, summary
+- `suggested_name` format: natural title case, no date, no extension, e.g. `Fountain Green City Newsletter` or `Xfinity Internet Bill`
+- `extracted_metadata` includes: company, date, amount, account_number, due_date, payment_url, summary
 - Task updates `Document.ai_generated_name`, `Document.document_type`, and `Document.ai_metadata` (JSON)
 - Auto-creates `Tag` records for suggested tags (default color `#6B7280`) and associates them with the document
 - `ValueError` from provider (missing config/key) marks job as failed without retrying; other exceptions trigger normal retry logic

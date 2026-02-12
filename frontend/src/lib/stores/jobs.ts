@@ -17,12 +17,14 @@ export interface TrackedJob {
 }
 
 type DocumentUpdatedCallback = (event: DocumentUpdatedEvent) => void;
+type JobEventCallback = (event: JobEvent) => void;
 
 function createJobStore() {
 	const { subscribe, update } = writable<TrackedJob[]>([]);
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
 	let sseConnected = false;
 	const documentUpdateCallbacks = new Set<DocumentUpdatedCallback>();
+	const jobEventCallbacks = new Set<JobEventCallback>();
 
 	function startPolling() {
 		if (pollInterval) return;
@@ -94,6 +96,10 @@ function createJobStore() {
 	}
 
 	function handleJobEvent(event: JobEvent) {
+		for (const cb of jobEventCallbacks) {
+			cb(event);
+		}
+
 		const jobs = get({ subscribe });
 		const existing = jobs.find((j) => j.jobId === event.job_id);
 
@@ -196,6 +202,7 @@ function createJobStore() {
 		stopPolling();
 		sseConnected = false;
 		documentUpdateCallbacks.clear();
+		jobEventCallbacks.clear();
 	}
 
 	function onDocumentUpdated(callback: DocumentUpdatedCallback): () => void {
@@ -205,7 +212,14 @@ function createJobStore() {
 		};
 	}
 
-	return { subscribe, track, dismiss, clearCompleted, init, destroy, onDocumentUpdated };
+	function onJobEvent(callback: JobEventCallback): () => void {
+		jobEventCallbacks.add(callback);
+		return () => {
+			jobEventCallbacks.delete(callback);
+		};
+	}
+
+	return { subscribe, track, dismiss, clearCompleted, init, destroy, onDocumentUpdated, onJobEvent };
 }
 
 export const jobStore = createJobStore();

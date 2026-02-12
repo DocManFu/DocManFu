@@ -94,6 +94,25 @@ export interface JobStatusResponse {
 	result_data: Record<string, unknown> | null;
 }
 
+export interface JobListItem extends JobStatusResponse {
+	document_name: string;
+}
+
+export interface JobListResponse {
+	jobs: JobListItem[];
+	total: number;
+	offset: number;
+	limit: number;
+}
+
+export interface JobListParams {
+	status?: string;
+	job_type?: string;
+	sort_order?: 'asc' | 'desc';
+	offset?: number;
+	limit?: number;
+}
+
 export interface DocumentUpdateRequest {
 	original_name?: string;
 	tags?: string[];
