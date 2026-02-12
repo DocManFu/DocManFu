@@ -36,14 +36,14 @@
 		<div class="flex items-center justify-between h-16">
 			<a href="/documents" class="flex items-center gap-2 text-lg font-bold text-brand-600 no-underline">
 				<span class="i-lucide-folder-open text-xl"></span>
-				DocManFu
+				<span class="hidden sm:inline">DocManFu</span>
 			</a>
 
-			<div class="flex items-center gap-1">
+			<div class="flex items-center gap-0.5 sm:gap-1">
 				{#each navLinks as link}
 					<a
 						href={link.href}
-						class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium no-underline transition-colors
+						class="flex items-center gap-2 px-1.5 sm:px-3 py-2 rounded-lg text-sm font-medium no-underline transition-colors
 							{isActive(link.href, $page.url.pathname)
 								? 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400'
 								: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'}"
@@ -56,7 +56,7 @@
 				{#if $isAdmin}
 					<a
 						href="/admin/users"
-						class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium no-underline transition-colors
+						class="flex items-center gap-2 px-1.5 sm:px-3 py-2 rounded-lg text-sm font-medium no-underline transition-colors
 							{isActive('/admin', $page.url.pathname)
 								? 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400'
 								: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'}"

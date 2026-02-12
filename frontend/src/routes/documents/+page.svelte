@@ -276,12 +276,13 @@
 </svelte:head>
 
 <div class="page-container" bind:this={containerEl}>
-	<div class="flex items-center justify-between mb-6">
+	<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
 		<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Documents</h1>
 		<div class="flex items-center gap-2">
 			<ViewToggle value={currentViewMode} onchange={handleViewModeChange} />
 			<button
 				class="btn-secondary btn-sm"
+				title="Export CSV"
 				onclick={() => downloadExportCsv({
 					document_type: documentType || undefined,
 					tag: tags.length > 0 ? tags.join(',') : undefined,
@@ -291,17 +292,18 @@
 					untyped: untyped ? 'true' : undefined
 				})}
 			>
-				<span class="i-lucide-download mr-1"></span>CSV
+				<span class="i-lucide-download sm:mr-1"></span><span class="hidden sm:inline">CSV</span>
 			</button>
 			<button
 				class="btn-secondary btn-sm"
+				title={selectMode ? 'Cancel selection' : 'Select documents'}
 				onclick={() => selectMode ? exitSelectMode() : (selectMode = true)}
 			>
-				<span class="i-lucide-check-square mr-1"></span>
-				{selectMode ? 'Cancel' : 'Select'}
+				<span class="i-lucide-check-square sm:mr-1"></span>
+				<span class="hidden sm:inline">{selectMode ? 'Cancel' : 'Select'}</span>
 			</button>
-			<a href="/upload" class="btn-primary no-underline">
-				<span class="i-lucide-upload mr-2"></span>Upload
+			<a href="/upload" class="btn-primary no-underline" title="Upload document">
+				<span class="i-lucide-upload sm:mr-2"></span><span class="hidden sm:inline">Upload</span>
 			</a>
 		</div>
 	</div>

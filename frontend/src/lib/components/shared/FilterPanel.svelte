@@ -34,9 +34,9 @@
 	let hasFilters = $derived(documentType || tags.length > 0 || dateFrom || dateTo);
 </script>
 
-<div class="flex flex-wrap items-center gap-3">
+<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
 	<select
-		class="input-base w-auto"
+		class="input-base w-full sm:w-auto"
 		bind:value={documentType}
 		onchange={() => onchange()}
 	>
@@ -46,20 +46,20 @@
 		{/each}
 	</select>
 
-	<div class="w-56">
+	<div class="w-full sm:w-56">
 		<TagAutocomplete selected={tags} onchange={handleTagChange} />
 	</div>
 
 	<input
 		type="date"
-		class="input-base w-auto"
+		class="input-base w-full sm:w-auto"
 		bind:value={dateFrom}
 		onchange={() => onchange()}
 	/>
-	<span class="text-gray-400 dark:text-gray-500 text-sm">to</span>
+	<span class="hidden sm:inline text-gray-400 dark:text-gray-500 text-sm">to</span>
 	<input
 		type="date"
-		class="input-base w-auto"
+		class="input-base w-full sm:w-auto"
 		bind:value={dateTo}
 		onchange={() => onchange()}
 	/>
