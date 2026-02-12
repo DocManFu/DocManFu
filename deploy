@@ -125,10 +125,33 @@ fi
 
 if [[ ${#SERVICES[@]} -gt 0 ]]; then
     info "Building ${SERVICES[*]}..."
-    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS build ${SERVICES[*]} && docker compose $PROFILE_ARGS up -d ${SERVICES[*]}"
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS build ${SERVICES[*]} 2>&1"
+    ok "Build complete"
+
+    info "Starting ${SERVICES[*]}..."
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS up -d ${SERVICES[*]} 2>&1"
 else
     info "Building all services..."
-    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS build && docker compose $PROFILE_ARGS up -d"
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS build 2>&1"
+    ok "Build complete"
+
+    info "Starting containers (waiting for migrations and health checks)..."
+    ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose $PROFILE_ARGS up -d 2>&1"
 fi
 
-ok "Deploy complete"
+ok "Containers started"
+
+# --- Health check ---
+info "Verifying API health..."
+RETRIES=15
+for i in $(seq 1 $RETRIES); do
+    if ssh "$DEPLOY_HOST" "cd $DEPLOY_PATH && docker compose exec -T api python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\"" > /dev/null 2>&1; then
+        ok "Deploy complete — API healthy"
+        exit 0
+    fi
+    sleep 2
+done
+
+warn "API did not respond after ${RETRIES} attempts"
+warn "Check logs: ssh $DEPLOY_HOST 'cd $DEPLOY_PATH && docker compose logs api --tail 50'"
+exit 1
