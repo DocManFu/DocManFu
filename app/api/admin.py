@@ -156,9 +156,7 @@ def update_user(
         # Prevent removing last admin
         if user.role == "admin" and req.role != "admin":
             admin_count = (
-                db.query(User)
-                .filter(User.role == "admin", User.is_active)
-                .count()
+                db.query(User).filter(User.role == "admin", User.is_active).count()
             )
             if admin_count <= 1:
                 raise HTTPException(
@@ -176,9 +174,7 @@ def update_user(
             # Can't deactivate last admin
             if user.role == "admin":
                 admin_count = (
-                    db.query(User)
-                    .filter(User.role == "admin", User.is_active)
-                    .count()
+                    db.query(User).filter(User.role == "admin", User.is_active).count()
                 )
                 if admin_count <= 1:
                     raise HTTPException(
