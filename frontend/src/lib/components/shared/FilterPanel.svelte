@@ -11,11 +11,26 @@
 		onchange: () => void;
 	}
 
-	let { documentType = $bindable(), tags = $bindable(), dateFrom = $bindable(), dateTo = $bindable(), onchange }: Props = $props();
+	let {
+		documentType = $bindable(),
+		tags = $bindable(),
+		dateFrom = $bindable(),
+		dateTo = $bindable(),
+		onchange,
+	}: Props = $props();
 
 	const docTypes: DocumentType[] = [
-		'bill', 'bank_statement', 'medical', 'insurance', 'tax',
-		'invoice', 'receipt', 'legal', 'correspondence', 'report', 'other'
+		'bill',
+		'bank_statement',
+		'medical',
+		'insurance',
+		'tax',
+		'invoice',
+		'receipt',
+		'legal',
+		'correspondence',
+		'report',
+		'other',
 	];
 
 	function clearFilters() {
@@ -35,11 +50,7 @@
 </script>
 
 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
-	<select
-		class="input-base w-full sm:w-auto"
-		bind:value={documentType}
-		onchange={() => onchange()}
-	>
+	<select class="input-base w-full sm:w-auto" bind:value={documentType} onchange={() => onchange()}>
 		<option value="">All types</option>
 		{#each docTypes as dt}
 			<option value={dt}>{formatDocumentType(dt)}</option>

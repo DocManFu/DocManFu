@@ -9,7 +9,9 @@
 	let { value, onchange }: Props = $props();
 </script>
 
-<div class="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+<div
+	class="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+>
 	<button
 		class="p-1.5 transition-colors {value === 'grid'
 			? 'bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300'

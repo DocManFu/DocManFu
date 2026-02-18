@@ -24,11 +24,13 @@
 		legal: 'i-lucide-scale',
 		correspondence: 'i-lucide-mail',
 		report: 'i-lucide-bar-chart-3',
-		other: 'i-lucide-file'
+		other: 'i-lucide-file',
 	};
 
 	let isImage = $derived(doc.mime_type?.startsWith('image/') ?? false);
-	let typeIcon = $derived(isImage ? 'i-lucide-image' : (typeIcons[doc.document_type ?? ''] ?? 'i-lucide-file'));
+	let typeIcon = $derived(
+		isImage ? 'i-lucide-image' : (typeIcons[doc.document_type ?? ''] ?? 'i-lucide-file'),
+	);
 </script>
 
 <a
@@ -38,7 +40,9 @@
 		{focused ? 'ring-2 ring-brand-400' : ''}"
 >
 	<div class="flex items-start gap-3">
-		<div class="flex-shrink-0 w-10 h-10 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
+		<div
+			class="flex-shrink-0 w-10 h-10 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center"
+		>
 			<span class="{typeIcon} text-brand-600 dark:text-brand-400"></span>
 		</div>
 

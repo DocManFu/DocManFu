@@ -8,7 +8,10 @@
 
 	pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-	interface Props { src: string; highlight?: string; }
+	interface Props {
+		src: string;
+		highlight?: string;
+	}
 	let { src, highlight = '' }: Props = $props();
 
 	let canvasContainer: HTMLDivElement;
@@ -131,13 +134,17 @@
 		</div>
 	{:else}
 		{#if pageCount > 0}
-			<div class="flex items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400">
+			<div
+				class="flex items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400"
+			>
 				<span class="i-lucide-file-text mr-1"></span>
-				{pageCount} {pageCount === 1 ? 'page' : 'pages'}
+				{pageCount}
+				{pageCount === 1 ? 'page' : 'pages'}
 				{#if highlightActive && matchCount > 0}
 					<span class="mx-2 text-gray-300 dark:text-gray-600">|</span>
 					<span class="text-amber-600 dark:text-amber-400">
-						{matchCount} {matchCount === 1 ? 'match' : 'matches'}
+						{matchCount}
+						{matchCount === 1 ? 'match' : 'matches'}
 					</span>
 					<button
 						class="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -206,7 +213,7 @@
 		display: contents;
 	}
 
-	:global(.textLayer span[role="img"]) {
+	:global(.textLayer span[role='img']) {
 		-webkit-user-select: none;
 		-moz-user-select: none;
 		user-select: none;

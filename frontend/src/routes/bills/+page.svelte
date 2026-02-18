@@ -14,7 +14,7 @@
 		{ key: 'unpaid', label: 'Unpaid' },
 		{ key: 'paid', label: 'Paid' },
 		{ key: 'dismissed', label: 'Dismissed' },
-		{ key: 'all', label: 'All' }
+		{ key: 'all', label: 'All' },
 	];
 
 	let bills = $state<BillListItem[]>([]);
@@ -125,8 +125,8 @@
 			<button
 				class="px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px
 					{activeTab === tab.key
-						? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400'
-						: 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
+					? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400'
+					: 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
 				onclick={() => switchTab(tab.key)}
 			>
 				{tab.label}
@@ -140,7 +140,9 @@
 		<EmptyState
 			icon="i-lucide-receipt"
 			title="No {activeTab === 'all' ? '' : activeTab} bills"
-			description={activeTab === 'unpaid' ? 'Upload a bill PDF and it will appear here after AI processing.' : 'No bills match this filter.'}
+			description={activeTab === 'unpaid'
+				? 'Upload a bill PDF and it will appear here after AI processing.'
+				: 'No bills match this filter.'}
 		/>
 	{:else}
 		<div class="card overflow-hidden">
@@ -149,11 +151,18 @@
 					<tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
 						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">From</th>
 						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Date</th>
-						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Document</th>
-						<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Amount</th>
-						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Due Date</th>
+						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+							>Document</th
+						>
+						<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Amount</th
+						>
+						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+							>Due Date</th
+						>
 						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
-						<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+						<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+							>Actions</th
+						>
 					</tr>
 				</thead>
 				<tbody>
@@ -165,13 +174,22 @@
 								{isOverdue(bill) ? 'bg-red-50 dark:bg-red-900/10' : ''}"
 							onclick={() => goto(`/documents/${bill.id}`)}
 						>
-							<td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{company(bill)}</td>
+							<td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{company(bill)}</td
+							>
 							<td class="px-4 py-3 text-gray-600 dark:text-gray-400">{docDate(bill)}</td>
-							<td class="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate">{displayName(bill)}</td>
-							<td class="px-4 py-3 text-right font-mono text-gray-900 dark:text-gray-100">{amount(bill)}</td>
+							<td class="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate"
+								>{displayName(bill)}</td
+							>
+							<td class="px-4 py-3 text-right font-mono text-gray-900 dark:text-gray-100"
+								>{amount(bill)}</td
+							>
 							<td class="px-4 py-3">
 								{#if bill.bill_due_date}
-									<span class="{isOverdue(bill) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-600 dark:text-gray-400'}">
+									<span
+										class={isOverdue(bill)
+											? 'text-red-600 dark:text-red-400 font-medium'
+											: 'text-gray-600 dark:text-gray-400'}
+									>
 										{formatDate(bill.bill_due_date)}
 										{#if isOverdue(bill)}
 											<span class="text-xs ml-1">(overdue)</span>
@@ -183,15 +201,21 @@
 							</td>
 							<td class="px-4 py-3">
 								{#if bill.bill_status === 'unpaid'}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+									>
 										Unpaid
 									</span>
 								{:else if bill.bill_status === 'paid'}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+									>
 										Paid
 									</span>
 								{:else if bill.bill_status === 'dismissed'}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+									>
 										Dismissed
 									</span>
 								{/if}

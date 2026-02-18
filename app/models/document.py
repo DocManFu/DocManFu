@@ -15,12 +15,8 @@ class Document(UUIDMixin, TimestampMixin, Base):
     filename: Mapped[str] = mapped_column(String(500))
     original_name: Mapped[str] = mapped_column(String(500))
     content_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    ai_generated_name: Mapped[Optional[str]] = mapped_column(
-        String(500), nullable=True
-    )
-    document_type: Mapped[Optional[str]] = mapped_column(
-        String(100), nullable=True
-    )
+    ai_generated_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    document_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     ai_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     file_path: Mapped[str] = mapped_column(String(1000))
     mime_type: Mapped[str] = mapped_column(String(100))
@@ -44,9 +40,7 @@ class Document(UUIDMixin, TimestampMixin, Base):
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
-    search_vector: Mapped[Optional[str]] = mapped_column(
-        TSVECTOR, nullable=True
-    )
+    search_vector: Mapped[Optional[str]] = mapped_column(TSVECTOR, nullable=True)
 
     owner: Mapped[Optional["User"]] = relationship(back_populates="documents")
     tags: Mapped[list["Tag"]] = relationship(

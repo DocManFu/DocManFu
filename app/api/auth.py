@@ -127,7 +127,9 @@ def setup_admin(req: SetupRequest, db: Session = Depends(get_db)):
         )
 
     if len(req.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        raise HTTPException(
+            status_code=400, detail="Password must be at least 8 characters"
+        )
 
     user = User(
         username=req.username,
@@ -148,7 +150,9 @@ def setup_admin(req: SetupRequest, db: Session = Depends(get_db)):
     )
     db.commit()
 
-    logger.info("Admin user '%s' created during setup, existing data assigned", user.username)
+    logger.info(
+        "Admin user '%s' created during setup, existing data assigned", user.username
+    )
     return _token_response(user)
 
 
@@ -221,7 +225,9 @@ def change_password(
     if not verify_password(req.current_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     if len(req.new_password) < 8:
-        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+        raise HTTPException(
+            status_code=400, detail="New password must be at least 8 characters"
+        )
 
     user.hashed_password = hash_password(req.new_password)
     db.commit()

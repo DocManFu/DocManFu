@@ -21,7 +21,7 @@
 	let filtered = $derived(
 		allTags
 			.filter((t) => !selected.includes(t.name))
-			.filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
+			.filter((t) => t.name.toLowerCase().includes(query.toLowerCase())),
 	);
 
 	onMount(async () => {
@@ -120,7 +120,9 @@
 			{#each filtered as tag, i (tag.id)}
 				<li
 					class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer
-						{i === highlightedIndex ? 'bg-brand-50 dark:bg-brand-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}"
+						{i === highlightedIndex
+						? 'bg-brand-50 dark:bg-brand-900/30'
+						: 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}"
 					role="option"
 					aria-selected={i === highlightedIndex}
 					onclick={() => selectTag(tag.name)}

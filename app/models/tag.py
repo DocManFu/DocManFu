@@ -11,16 +11,16 @@ from app.db.base import Base, UUIDMixin
 document_tags = Table(
     "document_tags",
     Base.metadata,
-    Column("document_id", UUID(as_uuid=True), ForeignKey("documents.id"), primary_key=True),
+    Column(
+        "document_id", UUID(as_uuid=True), ForeignKey("documents.id"), primary_key=True
+    ),
     Column("tag_id", UUID(as_uuid=True), ForeignKey("tags.id"), primary_key=True),
 )
 
 
 class Tag(UUIDMixin, Base):
     __tablename__ = "tags"
-    __table_args__ = (
-        UniqueConstraint("name", "user_id", name="uq_tags_name_user_id"),
-    )
+    __table_args__ = (UniqueConstraint("name", "user_id", name="uq_tags_name_user_id"),)
 
     name: Mapped[str] = mapped_column(String(100))
     color: Mapped[str] = mapped_column(String(7))

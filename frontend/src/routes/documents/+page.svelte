@@ -2,7 +2,12 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { listDocuments, bulkDeleteDocuments, bulkReprocessDocuments, downloadExportCsv } from '$lib/api/documents.js';
+	import {
+		listDocuments,
+		bulkDeleteDocuments,
+		bulkReprocessDocuments,
+		downloadExportCsv,
+	} from '$lib/api/documents.js';
 	import type { DocumentListItem, ListDocumentsParams } from '$lib/types/index.js';
 	import DocumentCard from '$lib/components/documents/DocumentCard.svelte';
 	import DocumentRow from '$lib/components/documents/DocumentRow.svelte';
@@ -65,7 +70,12 @@
 		const p = $page.url.searchParams;
 		documentType = p.get('document_type') ?? '';
 		const tagParam = p.get('tag') ?? '';
-		tags = tagParam ? tagParam.split(',').map((t) => t.trim()).filter(Boolean) : [];
+		tags = tagParam
+			? tagParam
+					.split(',')
+					.map((t) => t.trim())
+					.filter(Boolean)
+			: [];
 		dateFrom = p.get('date_from') ?? '';
 		dateTo = p.get('date_to') ?? '';
 		sortBy = p.get('sort_by') ?? 'upload_date';
@@ -252,7 +262,7 @@
 					loadMore();
 				}
 			},
-			{ rootMargin: '200px' }
+			{ rootMargin: '200px' },
 		);
 
 		const unsubDocUpdated = jobStore.onDocumentUpdated(() => {
@@ -288,21 +298,22 @@
 			<button
 				class="btn-secondary btn-sm"
 				title="Export CSV"
-				onclick={() => downloadExportCsv({
-					document_type: documentType || undefined,
-					tag: tags.length > 0 ? tags.join(',') : undefined,
-					date_from: dateFrom || undefined,
-					date_to: dateTo || undefined,
-					untagged: untagged ? 'true' : undefined,
-					untyped: untyped ? 'true' : undefined
-				})}
+				onclick={() =>
+					downloadExportCsv({
+						document_type: documentType || undefined,
+						tag: tags.length > 0 ? tags.join(',') : undefined,
+						date_from: dateFrom || undefined,
+						date_to: dateTo || undefined,
+						untagged: untagged ? 'true' : undefined,
+						untyped: untyped ? 'true' : undefined,
+					})}
 			>
 				<span class="i-lucide-download sm:mr-1"></span><span class="hidden sm:inline">CSV</span>
 			</button>
 			<button
 				class="btn-secondary btn-sm"
 				title={selectMode ? 'Cancel selection' : 'Select documents'}
-				onclick={() => selectMode ? exitSelectMode() : (selectMode = true)}
+				onclick={() => (selectMode ? exitSelectMode() : (selectMode = true))}
 			>
 				<span class="i-lucide-check-square sm:mr-1"></span>
 				<span class="hidden sm:inline">{selectMode ? 'Cancel' : 'Select'}</span>
@@ -322,18 +333,10 @@
 				bind:dateTo
 				onchange={handleFilterChange}
 			/>
-			<SortSelect
-				bind:sortBy
-				bind:sortOrder
-				onchange={handleFilterChange}
-			/>
+			<SortSelect bind:sortBy bind:sortOrder onchange={handleFilterChange} />
 		</div>
 		<div class="border-t border-gray-100 dark:border-gray-700 mt-3 pt-3">
-			<QuickFilters
-				bind:untagged
-				bind:untyped
-				onchange={handleFilterChange}
-			/>
+			<QuickFilters bind:untagged bind:untyped onchange={handleFilterChange} />
 		</div>
 	</div>
 
@@ -363,8 +366,12 @@
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<div class="relative cursor-pointer" onclick={() => toggleSelect(doc.id)}>
 							<div class="absolute top-2 left-2 z-10">
-								<div class="w-5 h-5 rounded border-2 flex items-center justify-center
-									{selectedIds.has(doc.id) ? 'bg-brand-600 border-brand-600' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600'}">
+								<div
+									class="w-5 h-5 rounded border-2 flex items-center justify-center
+									{selectedIds.has(doc.id)
+										? 'bg-brand-600 border-brand-600'
+										: 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600'}"
+								>
 									{#if selectedIds.has(doc.id)}
 										<span class="i-lucide-check text-white text-xs"></span>
 									{/if}
@@ -387,8 +394,12 @@
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div class="flex items-center cursor-pointer" onclick={() => toggleSelect(doc.id)}>
 								<div class="flex-shrink-0 pl-3">
-									<div class="w-5 h-5 rounded border-2 flex items-center justify-center
-										{selectedIds.has(doc.id) ? 'bg-brand-600 border-brand-600' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600'}">
+									<div
+										class="w-5 h-5 rounded border-2 flex items-center justify-center
+										{selectedIds.has(doc.id)
+											? 'bg-brand-600 border-brand-600'
+											: 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600'}"
+									>
 										{#if selectedIds.has(doc.id)}
 											<span class="i-lucide-check text-white text-xs"></span>
 										{/if}
@@ -416,9 +427,7 @@
 					<LoadingSpinner />
 				{:else}
 					<div bind:this={sentinelEl}></div>
-					<button class="btn-secondary btn-sm" onclick={loadMore}>
-						Load more
-					</button>
+					<button class="btn-secondary btn-sm" onclick={loadMore}> Load more </button>
 				{/if}
 			{/if}
 		</div>
@@ -428,13 +437,13 @@
 <!-- Floating bulk action bar -->
 {#if selectMode && selectedIds.size > 0}
 	<div class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
-		<div class="flex items-center gap-3 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
-			<span class="text-sm font-medium text-gray-700 dark:text-gray-300">{selectedIds.size} selected</span>
-			<button
-				class="btn-secondary btn-sm"
-				onclick={handleBulkReprocess}
-				disabled={bulkProcessing}
+		<div
+			class="flex items-center gap-3 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 py-3"
+		>
+			<span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+				>{selectedIds.size} selected</span
 			>
+			<button class="btn-secondary btn-sm" onclick={handleBulkReprocess} disabled={bulkProcessing}>
 				<span class="i-lucide-refresh-cw mr-1"></span>Reprocess
 			</button>
 			<button

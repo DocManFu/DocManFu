@@ -3,8 +3,13 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.formparsers import MultiPartParser
+
+# Allow large file uploads (ENEX files can be multiple GB)
+MultiPartParser.max_part_size = 1024 * 1024 * 1024 * 5  # 5 GB
 
 from app.api.admin import router as admin_router
+from app.api.imports import router as imports_router
 from app.api.auth import router as auth_router
 from app.api.bills import router as bills_router
 from app.api.documents import router as documents_router
@@ -41,7 +46,9 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    logger.error(
+        "Unhandled exception on %s %s: %s", request.method, request.url.path, exc
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
@@ -51,6 +58,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(imports_router)
 app.include_router(events_router)
 app.include_router(documents_router)
 app.include_router(jobs_router)

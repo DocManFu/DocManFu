@@ -24,11 +24,13 @@
 		legal: 'i-lucide-scale',
 		correspondence: 'i-lucide-mail',
 		report: 'i-lucide-bar-chart-3',
-		other: 'i-lucide-file'
+		other: 'i-lucide-file',
 	};
 
 	let isImage = $derived(doc.mime_type?.startsWith('image/') ?? false);
-	let typeIcon = $derived(isImage ? 'i-lucide-image' : (typeIcons[doc.document_type ?? ''] ?? 'i-lucide-file'));
+	let typeIcon = $derived(
+		isImage ? 'i-lucide-image' : (typeIcons[doc.document_type ?? ''] ?? 'i-lucide-file'),
+	);
 </script>
 
 <a
@@ -37,7 +39,9 @@
 		{selected ? 'bg-brand-50 dark:bg-brand-900/20' : ''}
 		{focused ? 'bg-brand-50/50 dark:bg-brand-900/10 ring-1 ring-inset ring-brand-400' : ''}"
 >
-	<div class="flex-shrink-0 w-8 h-8 rounded-md bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
+	<div
+		class="flex-shrink-0 w-8 h-8 rounded-md bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center"
+	>
 		<span class="{typeIcon} text-sm text-brand-600 dark:text-brand-400"></span>
 	</div>
 
@@ -46,12 +50,16 @@
 	</div>
 
 	{#if doc.document_type}
-		<span class="hidden sm:inline-block flex-shrink-0 badge bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 text-xs">
+		<span
+			class="hidden sm:inline-block flex-shrink-0 badge bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 text-xs"
+		>
 			{formatDocumentType(doc.document_type)}
 		</span>
 	{/if}
 
-	<span class="hidden md:inline-block flex-shrink-0 text-xs text-gray-500 dark:text-gray-400 w-16 text-right">
+	<span
+		class="hidden md:inline-block flex-shrink-0 text-xs text-gray-500 dark:text-gray-400 w-16 text-right"
+	>
 		{formatFileSize(doc.file_size)}
 	</span>
 

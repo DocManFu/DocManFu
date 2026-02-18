@@ -30,7 +30,9 @@
 </script>
 
 <div class="relative">
-	<span class="i-lucide-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></span>
+	<span
+		class="i-lucide-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+	></span>
 	<input
 		type="text"
 		class="input-base pl-10 pr-8"

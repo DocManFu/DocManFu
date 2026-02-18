@@ -121,7 +121,9 @@ def get_document_jobs(
 ):
     """Get active (pending/processing) jobs for a document."""
     # Verify ownership
-    doc_query = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None))
+    doc_query = db.query(Document).filter(
+        Document.id == document_id, Document.deleted_at.is_(None)
+    )
     if user.role != "admin":
         doc_query = doc_query.filter(Document.user_id == user.id)
     if not doc_query.first():
@@ -153,14 +155,18 @@ def get_document_jobs(
     ]
 
 
-@router.get("/by-document/{document_id}/history", response_model=list[JobStatusResponse])
+@router.get(
+    "/by-document/{document_id}/history", response_model=list[JobStatusResponse]
+)
 def get_document_job_history(
     document_id: uuid.UUID,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Get all processing jobs for a document (including completed/failed)."""
-    doc_query = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None))
+    doc_query = db.query(Document).filter(
+        Document.id == document_id, Document.deleted_at.is_(None)
+    )
     if user.role != "admin":
         doc_query = doc_query.filter(Document.user_id == user.id)
     if not doc_query.first():

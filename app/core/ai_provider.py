@@ -113,7 +113,9 @@ Rules:
 """
 
 
-def _build_user_message(text: str, original_filename: str, max_text_length: int = 4000) -> str:
+def _build_user_message(
+    text: str, original_filename: str, max_text_length: int = 4000
+) -> str:
     """Build the user message containing document text for analysis."""
     truncated = text[:max_text_length]
     was_truncated = len(text) > max_text_length
@@ -124,7 +126,9 @@ def _build_user_message(text: str, original_filename: str, max_text_length: int 
         truncated,
     ]
     if was_truncated:
-        parts.append(f"\n[Text truncated at {max_text_length} characters out of {len(text)} total]")
+        parts.append(
+            f"\n[Text truncated at {max_text_length} characters out of {len(text)} total]"
+        )
     return "\n".join(parts)
 
 
@@ -158,7 +162,9 @@ def _load_ai_config() -> dict:
         finally:
             db.close()
     except Exception as exc:
-        logger.warning("Failed to load AI config from DB, falling back to env vars: %s", exc)
+        logger.warning(
+            "Failed to load AI config from DB, falling back to env vars: %s", exc
+        )
         return {
             "ai_provider": settings.AI_PROVIDER,
             "ai_api_key": settings.AI_API_KEY,
@@ -179,7 +185,9 @@ def _call_openai(text: str, original_filename: str, config: dict) -> str:
     """Call OpenAI chat completions API and return the raw response text."""
     from openai import OpenAI
 
-    client = OpenAI(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
+    client = OpenAI(
+        api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60)
+    )
     model = config.get("ai_model") or "gpt-4o-mini"
     max_text = int(config.get("ai_max_text_length") or 4000)
 
@@ -187,7 +195,10 @@ def _call_openai(text: str, original_filename: str, config: dict) -> str:
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_message(text, original_filename, max_text)},
+            {
+                "role": "user",
+                "content": _build_user_message(text, original_filename, max_text),
+            },
         ],
         temperature=0.2,
         response_format={"type": "json_object"},
@@ -199,7 +210,9 @@ def _call_anthropic(text: str, original_filename: str, config: dict) -> str:
     """Call Anthropic messages API and return the raw response text."""
     from anthropic import Anthropic
 
-    client = Anthropic(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
+    client = Anthropic(
+        api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60)
+    )
     model = config.get("ai_model") or "claude-sonnet-4-5-20250929"
     max_text = int(config.get("ai_max_text_length") or 4000)
 
@@ -208,7 +221,10 @@ def _call_anthropic(text: str, original_filename: str, config: dict) -> str:
         max_tokens=1024,
         system=SYSTEM_PROMPT,
         messages=[
-            {"role": "user", "content": _build_user_message(text, original_filename, max_text)},
+            {
+                "role": "user",
+                "content": _build_user_message(text, original_filename, max_text),
+            },
         ],
         temperature=0.2,
     )
@@ -221,7 +237,9 @@ def _call_ollama(text: str, original_filename: str, config: dict) -> str:
 
     raw_base = config.get("ai_base_url") or ""
     base_url = raw_base.rstrip("/") + "/v1" if raw_base else "http://localhost:11434/v1"
-    client = OpenAI(api_key="ollama", base_url=base_url, timeout=int(config.get("ai_timeout") or 60))
+    client = OpenAI(
+        api_key="ollama", base_url=base_url, timeout=int(config.get("ai_timeout") or 60)
+    )
     model = config.get("ai_model") or "llama3.2"
     max_text = int(config.get("ai_max_text_length") or 4000)
 
@@ -229,7 +247,10 @@ def _call_ollama(text: str, original_filename: str, config: dict) -> str:
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user_message(text, original_filename, max_text)},
+            {
+                "role": "user",
+                "content": _build_user_message(text, original_filename, max_text),
+            },
         ],
         temperature=0.2,
         response_format={"type": "json_object"},
@@ -251,15 +272,22 @@ def _call_openai_vision(images: list[str], original_filename: str, config: dict)
     """Call OpenAI with vision content blocks."""
     from openai import OpenAI
 
-    client = OpenAI(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
+    client = OpenAI(
+        api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60)
+    )
     model = config.get("ai_vision_model") or config.get("ai_model") or "gpt-4o"
 
     content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
     for img_b64 in images:
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{img_b64}", "detail": "high"},
-        })
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{img_b64}",
+                    "detail": "high",
+                },
+            }
+        )
 
     response = client.chat.completions.create(
         model=model,
@@ -273,19 +301,33 @@ def _call_openai_vision(images: list[str], original_filename: str, config: dict)
     return response.choices[0].message.content
 
 
-def _call_anthropic_vision(images: list[str], original_filename: str, config: dict) -> str:
+def _call_anthropic_vision(
+    images: list[str], original_filename: str, config: dict
+) -> str:
     """Call Anthropic with image content blocks."""
     from anthropic import Anthropic
 
-    client = Anthropic(api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60))
-    model = config.get("ai_vision_model") or config.get("ai_model") or "claude-sonnet-4-5-20250929"
+    client = Anthropic(
+        api_key=config["ai_api_key"], timeout=int(config.get("ai_timeout") or 60)
+    )
+    model = (
+        config.get("ai_vision_model")
+        or config.get("ai_model")
+        or "claude-sonnet-4-5-20250929"
+    )
 
     content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
     for img_b64 in images:
-        content.append({
-            "type": "image",
-            "source": {"type": "base64", "media_type": "image/png", "data": img_b64},
-        })
+        content.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/png",
+                    "data": img_b64,
+                },
+            }
+        )
 
     response = client.messages.create(
         model=model,
@@ -303,15 +345,24 @@ def _call_ollama_vision(images: list[str], original_filename: str, config: dict)
 
     raw_base = config.get("ai_base_url") or ""
     base_url = raw_base.rstrip("/") + "/v1" if raw_base else "http://localhost:11434/v1"
-    client = OpenAI(api_key="ollama", base_url=base_url, timeout=int(config.get("ai_timeout") or 60))
-    model = config.get("ai_vision_model") or config.get("ai_model") or "granite3.2-vision"
+    client = OpenAI(
+        api_key="ollama", base_url=base_url, timeout=int(config.get("ai_timeout") or 60)
+    )
+    model = (
+        config.get("ai_vision_model") or config.get("ai_model") or "granite3.2-vision"
+    )
 
     content = [{"type": "text", "text": f"Original filename: {original_filename}"}]
     for img_b64 in images:
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/png;base64,{img_b64}", "detail": "high"},
-        })
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{img_b64}",
+                    "detail": "high",
+                },
+            }
+        )
 
     response = client.chat.completions.create(
         model=model,
@@ -336,8 +387,17 @@ _VISION_PROVIDERS = {
 
 
 _VALID_DOCUMENT_TYPES = {
-    "bill", "invoice", "receipt", "bank_statement", "insurance",
-    "medical", "tax", "legal", "correspondence", "report", "other",
+    "bill",
+    "invoice",
+    "receipt",
+    "bank_statement",
+    "insurance",
+    "medical",
+    "tax",
+    "legal",
+    "correspondence",
+    "report",
+    "other",
 }
 
 # Maps common AI-generated type variations to valid types
@@ -398,7 +458,9 @@ def _parse_response(raw: str) -> AIAnalysisResult:
 # -- Public API ------------------------------------------------------------
 
 
-def analyze_document(text: str, original_filename: str, config: dict | None = None) -> AIAnalysisResult:
+def analyze_document(
+    text: str, original_filename: str, config: dict | None = None
+) -> AIAnalysisResult:
     """Analyze document text using the configured AI provider.
 
     Args:
@@ -426,10 +488,17 @@ def analyze_document(text: str, original_filename: str, config: dict | None = No
 
     call_fn = _PROVIDERS.get(provider)
     if call_fn is None:
-        raise ValueError(f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_PROVIDERS)}")
+        raise ValueError(
+            f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_PROVIDERS)}"
+        )
 
     model = config.get("ai_model") or "(default)"
-    logger.info("Calling AI provider '%s' (model: %s) for '%s'", provider, model, original_filename)
+    logger.info(
+        "Calling AI provider '%s' (model: %s) for '%s'",
+        provider,
+        model,
+        original_filename,
+    )
 
     raw_response = call_fn(text, original_filename, config)
     logger.debug("Raw AI response: %s", raw_response[:500])
@@ -444,7 +513,9 @@ def analyze_document(text: str, original_filename: str, config: dict | None = No
     return result
 
 
-def analyze_document_vision(images: list[str], original_filename: str, config: dict | None = None) -> AIAnalysisResult:
+def analyze_document_vision(
+    images: list[str], original_filename: str, config: dict | None = None
+) -> AIAnalysisResult:
     """Analyze document page images using the configured AI provider's vision model.
 
     Args:
@@ -472,12 +543,19 @@ def analyze_document_vision(images: list[str], original_filename: str, config: d
 
     call_fn = _VISION_PROVIDERS.get(provider)
     if call_fn is None:
-        raise ValueError(f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_VISION_PROVIDERS)}")
+        raise ValueError(
+            f"Unknown AI_PROVIDER: '{provider}'. Supported: {', '.join(_VISION_PROVIDERS)}"
+        )
 
-    vision_model = config.get("ai_vision_model") or config.get("ai_model") or "(default)"
+    vision_model = (
+        config.get("ai_vision_model") or config.get("ai_model") or "(default)"
+    )
     logger.info(
         "Calling AI provider '%s' vision (model: %s) for '%s' (%d pages)",
-        provider, vision_model, original_filename, len(images),
+        provider,
+        vision_model,
+        original_filename,
+        len(images),
     )
 
     raw_response = call_fn(images, original_filename, config)

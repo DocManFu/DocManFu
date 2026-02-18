@@ -69,7 +69,9 @@ def list_tags(db: Session = Depends(get_db), user: User = Depends(get_current_us
 
     rows = query.group_by(Tag.id).order_by(Tag.name).all()
     return [
-        TagWithCount(id=r.id, name=r.name, color=r.color, document_count=r.document_count)
+        TagWithCount(
+            id=r.id, name=r.name, color=r.color, document_count=r.document_count
+        )
         for r in rows
     ]
 
@@ -81,7 +83,9 @@ def create_tag(
     user: User = Depends(require_write_access),
 ):
     """Create a new tag."""
-    existing = db.query(Tag).filter(Tag.name == req.name, Tag.user_id == user.id).first()
+    existing = (
+        db.query(Tag).filter(Tag.name == req.name, Tag.user_id == user.id).first()
+    )
     if existing:
         raise HTTPException(status_code=409, detail="Tag already exists")
 
@@ -108,7 +112,9 @@ def update_tag(
         raise HTTPException(status_code=404, detail="Tag not found")
 
     if req.name is not None and req.name != tag.name:
-        conflict = db.query(Tag).filter(Tag.name == req.name, Tag.user_id == user.id).first()
+        conflict = (
+            db.query(Tag).filter(Tag.name == req.name, Tag.user_id == user.id).first()
+        )
         if conflict:
             raise HTTPException(status_code=409, detail="Tag name already in use")
         tag.name = req.name
@@ -170,7 +176,9 @@ def merge_tags(
         existing = set(
             r[0]
             for r in db.execute(
-                document_tags.select().where(document_tags.c.tag_id == req.target_tag_id)
+                document_tags.select().where(
+                    document_tags.c.tag_id == req.target_tag_id
+                )
             ).fetchall()
         )
 

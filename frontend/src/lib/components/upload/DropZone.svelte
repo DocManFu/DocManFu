@@ -13,7 +13,7 @@
 		'image/jpeg',
 		'image/png',
 		'image/tiff',
-		'image/webp'
+		'image/webp',
 	]);
 	const allowedExtensions = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp']);
 
@@ -54,7 +54,9 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
 	class="border-2 border-dashed rounded-xl p-12 text-center transition-colors
-		{dragging ? 'border-brand-400 bg-brand-50 dark:bg-brand-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}
+		{dragging
+		? 'border-brand-400 bg-brand-50 dark:bg-brand-900/20'
+		: 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'}
 		{disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}"
 	role="button"
 	tabindex="0"
@@ -64,11 +66,17 @@
 	onclick={() => !disabled && fileInput.click()}
 	onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !disabled && fileInput.click()}
 >
-	<span class="i-lucide-upload-cloud text-4xl {dragging ? 'text-brand-500' : 'text-gray-400'} mb-3 block mx-auto"></span>
+	<span
+		class="i-lucide-upload-cloud text-4xl {dragging
+			? 'text-brand-500'
+			: 'text-gray-400'} mb-3 block mx-auto"
+	></span>
 	<p class="text-base font-medium text-gray-700 dark:text-gray-300">
 		{dragging ? 'Drop files here' : 'Drag & drop files here'}
 	</p>
-	<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">PDF, JPEG, PNG, TIFF, or WebP (max 50 MB per file)</p>
+	<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+		PDF, JPEG, PNG, TIFF, or WebP (max 50 MB per file)
+	</p>
 </div>
 
 <input

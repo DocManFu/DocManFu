@@ -32,9 +32,7 @@
 			{#each Array.from({ length: totalPages }, (_, i) => i + 1) as pg}
 				{#if totalPages <= 7 || pg === 1 || pg === totalPages || Math.abs(pg - currentPage) <= 1}
 					<button
-						class="btn-sm min-w-8 {pg === currentPage
-							? 'btn-primary'
-							: 'btn-ghost'}"
+						class="btn-sm min-w-8 {pg === currentPage ? 'btn-primary' : 'btn-ghost'}"
 						onclick={() => onchange((pg - 1) * limit)}
 					>
 						{pg}

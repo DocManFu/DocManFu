@@ -48,7 +48,11 @@ def process_ai_analysis(self, job_id: str, document_id: str):
         # --- Phase 2: Text-first analysis, vision fallback for poor text (50%) ---
         self.update_job_progress(job_id, 20, JobStatus.processing)
 
-        from app.core.ai_provider import _load_ai_config, analyze_document, analyze_document_vision
+        from app.core.ai_provider import (
+            _load_ai_config,
+            analyze_document,
+            analyze_document_vision,
+        )
 
         ai_config = _load_ai_config()
         result = None
@@ -58,10 +62,13 @@ def process_ai_analysis(self, job_id: str, document_id: str):
         if text:
             logger.info(
                 "Using text-based analysis for '%s' (%d chars)",
-                document.original_name, len(text),
+                document.original_name,
+                len(text),
             )
             try:
-                result = analyze_document(text, document.original_name, config=ai_config)
+                result = analyze_document(
+                    text, document.original_name, config=ai_config
+                )
             except ValueError as exc:
                 self.mark_job_failed(job_id, str(exc))
                 return
@@ -98,7 +105,9 @@ def process_ai_analysis(self, job_id: str, document_id: str):
                     )
 
                 if images:
-                    result = analyze_document_vision(images, document.original_name, config=ai_config)
+                    result = analyze_document_vision(
+                        images, document.original_name, config=ai_config
+                    )
                     vision_used = True
             except ValueError as exc:
                 self.mark_job_failed(job_id, str(exc))
@@ -106,7 +115,8 @@ def process_ai_analysis(self, job_id: str, document_id: str):
             except Exception as exc:
                 logger.warning(
                     "Vision analysis also failed for '%s': %s",
-                    document.original_name, exc,
+                    document.original_name,
+                    exc,
                 )
 
         if result is None:
@@ -158,7 +168,11 @@ def process_ai_analysis(self, job_id: str, document_id: str):
             if not tag_name:
                 continue
             # Find existing tag or create new one (scoped to document owner)
-            tag = db.query(Tag).filter(Tag.name == tag_name, Tag.user_id == doc_user_id).first()
+            tag = (
+                db.query(Tag)
+                .filter(Tag.name == tag_name, Tag.user_id == doc_user_id)
+                .first()
+            )
             if tag is None:
                 tag = Tag(name=tag_name, color="#6B7280", user_id=doc_user_id)
                 db.add(tag)
@@ -174,11 +188,14 @@ def process_ai_analysis(self, job_id: str, document_id: str):
         changes = ["ai_generated_name", "document_type", "ai_metadata", "tags"]
         if result.document_type in ("bill", "invoice"):
             changes.append("bill_status")
-        publish_event("document.updated", {
-            "document_id": document_id,
-            "changes": changes,
-            "user_id": str(doc_user_id) if doc_user_id else None,
-        })
+        publish_event(
+            "document.updated",
+            {
+                "document_id": document_id,
+                "changes": changes,
+                "user_id": str(doc_user_id) if doc_user_id else None,
+            },
+        )
 
         # Update search vector
         from app.core.search import update_search_vector

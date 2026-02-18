@@ -20,13 +20,13 @@
 		{ key: 'pending', label: 'Pending' },
 		{ key: 'processing', label: 'Processing' },
 		{ key: 'completed', label: 'Completed' },
-		{ key: 'failed', label: 'Failed' }
+		{ key: 'failed', label: 'Failed' },
 	];
 
 	const jobTypeOptions = [
 		{ value: '', label: 'All Types' },
 		{ value: 'ocr', label: 'OCR' },
-		{ value: 'ai_analysis', label: 'AI Analysis' }
+		{ value: 'ai_analysis', label: 'AI Analysis' },
 	];
 
 	let jobs = $state<JobListItem[]>([]);
@@ -68,7 +68,7 @@
 				status: activeTab === 'all' ? undefined : activeTab,
 				job_type: jobTypeFilter || undefined,
 				offset,
-				limit
+				limit,
 			});
 			jobs = res.jobs;
 			total = res.total;
@@ -167,8 +167,8 @@
 			<button
 				class="px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px
 					{activeTab === tab.key
-						? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400'
-						: 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
+					? 'border-brand-600 text-brand-600 dark:border-brand-400 dark:text-brand-400'
+					: 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}"
 				onclick={() => switchTab(tab.key)}
 			>
 				{tab.label}
@@ -182,21 +182,37 @@
 		<EmptyState
 			icon="i-lucide-activity"
 			title="No jobs found"
-			description={activeTab === 'all' ? 'Upload a document to start processing.' : `No ${activeTab} jobs.`}
+			description={activeTab === 'all'
+				? 'Upload a document to start processing.'
+				: `No ${activeTab} jobs.`}
 		/>
 	{:else}
 		<div class="card overflow-hidden">
 			<div class="overflow-x-auto">
 				<table class="w-full text-sm">
 					<thead>
-						<tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Document</th>
+						<tr
+							class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
+						>
+							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+								>Document</th
+							>
 							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Type</th>
-							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
-							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400 w-32">Progress</th>
-							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Created</th>
-							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Duration</th>
-							<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+								>Status</th
+							>
+							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400 w-32"
+								>Progress</th
+							>
+							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+								>Created</th
+							>
+							<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+								>Duration</th
+							>
+							<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+								>Actions</th
+							>
 						</tr>
 					</thead>
 					<tbody>
@@ -207,7 +223,9 @@
 								class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 cursor-pointer transition-colors"
 								onclick={() => goto(`/documents/${job.document_id}`)}
 							>
-								<td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 max-w-xs truncate">
+								<td
+									class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 max-w-xs truncate"
+								>
 									{job.document_name}
 								</td>
 								<td class="px-4 py-3 text-gray-600 dark:text-gray-400">
@@ -222,12 +240,17 @@
 											<div class="flex-1">
 												<JobProgressBar progress={job.progress} />
 											</div>
-											<span class="text-xs text-gray-500 dark:text-gray-400 w-8 text-right">{job.progress}%</span>
+											<span class="text-xs text-gray-500 dark:text-gray-400 w-8 text-right"
+												>{job.progress}%</span
+											>
 										</div>
 									{:else if job.status === 'completed'}
 										<span class="text-xs text-gray-500 dark:text-gray-400">100%</span>
 									{:else if job.status === 'failed'}
-										<span class="text-xs text-red-500 dark:text-red-400 truncate max-w-[8rem] inline-block" title={job.error_message || ''}>
+										<span
+											class="text-xs text-red-500 dark:text-red-400 truncate max-w-[8rem] inline-block"
+											title={job.error_message || ''}
+										>
 											{job.error_message || 'Failed'}
 										</span>
 									{:else}

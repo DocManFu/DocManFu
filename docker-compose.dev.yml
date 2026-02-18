@@ -38,7 +38,7 @@ services:
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
       - ./scripts:/app/scripts
-      - uploads:/app/uploads
+      - ./uploads:/app/uploads
     environment:
       DATABASE_URL: postgresql://docmanfu:docmanfu@db:5432/docmanfu
       REDIS_URL: redis://redis:6379/0
@@ -63,7 +63,7 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./app:/app/app
-      - uploads:/app/uploads
+      - ./uploads:/app/uploads
     environment:
       DATABASE_URL: postgresql://docmanfu:docmanfu@db:5432/docmanfu
       REDIS_URL: redis://redis:6379/0
@@ -98,5 +98,4 @@ services:
 volumes:
   pgdata:
   redisdata:
-  uploads:
   frontend_node_modules:

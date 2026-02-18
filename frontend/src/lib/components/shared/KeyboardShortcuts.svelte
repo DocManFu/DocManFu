@@ -5,7 +5,12 @@
 		const el = document.activeElement;
 		if (!el) return false;
 		const tag = el.tagName.toLowerCase();
-		return tag === 'input' || tag === 'textarea' || tag === 'select' || (el as HTMLElement).isContentEditable;
+		return (
+			tag === 'input' ||
+			tag === 'textarea' ||
+			tag === 'select' ||
+			(el as HTMLElement).isContentEditable
+		);
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -39,30 +44,38 @@
 		}
 
 		if (e.key === 'j') {
-			document.querySelector('.page-container')?.dispatchEvent(
-				new CustomEvent('docnavigate', { detail: { direction: 'next' }, bubbles: true })
-			);
+			document
+				.querySelector('.page-container')
+				?.dispatchEvent(
+					new CustomEvent('docnavigate', { detail: { direction: 'next' }, bubbles: true }),
+				);
 			return;
 		}
 
 		if (e.key === 'k') {
-			document.querySelector('.page-container')?.dispatchEvent(
-				new CustomEvent('docnavigate', { detail: { direction: 'prev' }, bubbles: true })
-			);
+			document
+				.querySelector('.page-container')
+				?.dispatchEvent(
+					new CustomEvent('docnavigate', { detail: { direction: 'prev' }, bubbles: true }),
+				);
 			return;
 		}
 
 		if (e.key === 'Enter') {
-			document.querySelector('.page-container')?.dispatchEvent(
-				new CustomEvent('docnavigate', { detail: { direction: 'open' }, bubbles: true })
-			);
+			document
+				.querySelector('.page-container')
+				?.dispatchEvent(
+					new CustomEvent('docnavigate', { detail: { direction: 'open' }, bubbles: true }),
+				);
 			return;
 		}
 
 		if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-			document.querySelector('.page-container')?.dispatchEvent(
-				new CustomEvent('docnavigate', { detail: { direction: 'selectAll' }, bubbles: true })
-			);
+			document
+				.querySelector('.page-container')
+				?.dispatchEvent(
+					new CustomEvent('docnavigate', { detail: { direction: 'selectAll' }, bubbles: true }),
+				);
 			return;
 		}
 	}

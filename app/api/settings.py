@@ -74,10 +74,14 @@ def update_ai_settings(
         )
 
     if "ai_max_text_length" in data and data["ai_max_text_length"] < 100:
-        raise HTTPException(status_code=400, detail="ai_max_text_length must be at least 100")
+        raise HTTPException(
+            status_code=400, detail="ai_max_text_length must be at least 100"
+        )
 
     if "ai_timeout" in data and data["ai_timeout"] < 5:
-        raise HTTPException(status_code=400, detail="ai_timeout must be at least 5 seconds")
+        raise HTTPException(
+            status_code=400, detail="ai_timeout must be at least 5 seconds"
+        )
 
     if "ai_max_pages" in data and data["ai_max_pages"] < 1:
         raise HTTPException(status_code=400, detail="ai_max_pages must be at least 1")
@@ -158,7 +162,11 @@ def test_ai_connection(
             from openai import OpenAI
 
             base_url = config.get("ai_base_url") or ""
-            base_url = base_url.rstrip("/") + "/v1" if base_url else "http://localhost:11434/v1"
+            base_url = (
+                base_url.rstrip("/") + "/v1"
+                if base_url
+                else "http://localhost:11434/v1"
+            )
             client = OpenAI(api_key="ollama", base_url=base_url, timeout=timeout)
             m = model or "llama3.2"
             response = client.chat.completions.create(

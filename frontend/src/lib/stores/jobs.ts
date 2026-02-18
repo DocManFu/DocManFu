@@ -5,7 +5,9 @@ import {
 	disconnectSSE,
 	isSSEConnected,
 	type JobEvent,
-	type DocumentUpdatedEvent
+	type DocumentUpdatedEvent,
+	type ImportEvent,
+	type ReprocessEvent,
 } from '$lib/api/events.js';
 import type { JobStatusResponse } from '$lib/types/index.js';
 
@@ -18,6 +20,8 @@ export interface TrackedJob {
 
 type DocumentUpdatedCallback = (event: DocumentUpdatedEvent) => void;
 type JobEventCallback = (event: JobEvent) => void;
+type ImportEventCallback = (event: ImportEvent) => void;
+type ReprocessEventCallback = (event: ReprocessEvent) => void;
 
 function createJobStore() {
 	const { subscribe, update } = writable<TrackedJob[]>([]);
@@ -25,6 +29,12 @@ function createJobStore() {
 	let sseConnected = false;
 	const documentUpdateCallbacks = new Set<DocumentUpdatedCallback>();
 	const jobEventCallbacks = new Set<JobEventCallback>();
+	const importProgressCallbacks = new Set<ImportEventCallback>();
+	const importCompletedCallbacks = new Set<ImportEventCallback>();
+	const importFailedCallbacks = new Set<ImportEventCallback>();
+	const reprocessProgressCallbacks = new Set<ReprocessEventCallback>();
+	const reprocessCompletedCallbacks = new Set<ReprocessEventCallback>();
+	const reprocessCancelledCallbacks = new Set<ReprocessEventCallback>();
 
 	function startPolling() {
 		if (pollInterval) return;
@@ -40,15 +50,13 @@ function createJobStore() {
 
 	function hasActiveJobs(): boolean {
 		const jobs = get({ subscribe });
-		return jobs.some(
-			(j) => j.status.status === 'pending' || j.status.status === 'processing'
-		);
+		return jobs.some((j) => j.status.status === 'pending' || j.status.status === 'processing');
 	}
 
 	async function poll() {
 		const jobs = get({ subscribe });
 		const active = jobs.filter(
-			(j) => j.status.status === 'pending' || j.status.status === 'processing'
+			(j) => j.status.status === 'pending' || j.status.status === 'processing',
 		);
 
 		if (active.length === 0) {
@@ -81,10 +89,7 @@ function createJobStore() {
 
 			for (const job of activeJobs) {
 				if (!trackedIds.has(job.id)) {
-					update((all) => [
-						...all,
-						{ jobId: job.id, documentId, fileName, status: job }
-					]);
+					update((all) => [...all, { jobId: job.id, documentId, fileName, status: job }]);
 					added = true;
 				}
 			}
@@ -116,11 +121,11 @@ function createJobStore() {
 									progress: event.progress,
 									job_type: event.job_type as JobStatusResponse['job_type'],
 									result_data: event.result_data ?? j.status.result_data,
-									error_message: event.error_message ?? j.status.error_message
-								}
+									error_message: event.error_message ?? j.status.error_message,
+								},
 							}
-						: j
-				)
+						: j,
+				),
 			);
 		} else {
 			// Auto-track follow-on jobs (e.g. AI analysis after OCR) matched by document_id
@@ -140,8 +145,8 @@ function createJobStore() {
 						created_at: new Date().toISOString(),
 						started_at: new Date().toISOString(),
 						completed_at: null,
-						result_data: event.result_data ?? null
-					}
+						result_data: event.result_data ?? null,
+					},
 				};
 				update((all) => [...all, newJob]);
 			}
@@ -159,7 +164,7 @@ function createJobStore() {
 			created_at: new Date().toISOString(),
 			started_at: null,
 			completed_at: null,
-			result_data: null
+			result_data: null,
 		};
 		update((jobs) => [...jobs, { jobId, documentId, fileName, status: initial }]);
 		if (!sseConnected) startPolling();
@@ -171,7 +176,7 @@ function createJobStore() {
 
 	function clearCompleted() {
 		update((jobs) =>
-			jobs.filter((j) => j.status.status === 'pending' || j.status.status === 'processing')
+			jobs.filter((j) => j.status.status === 'pending' || j.status.status === 'processing'),
 		);
 	}
 
@@ -193,7 +198,25 @@ function createJobStore() {
 				for (const cb of documentUpdateCallbacks) {
 					cb(event);
 				}
-			}
+			},
+			onImportProgress(event) {
+				for (const cb of importProgressCallbacks) cb(event);
+			},
+			onImportCompleted(event) {
+				for (const cb of importCompletedCallbacks) cb(event);
+			},
+			onImportFailed(event) {
+				for (const cb of importFailedCallbacks) cb(event);
+			},
+			onReprocessProgress(event) {
+				for (const cb of reprocessProgressCallbacks) cb(event);
+			},
+			onReprocessCompleted(event) {
+				for (const cb of reprocessCompletedCallbacks) cb(event);
+			},
+			onReprocessCancelled(event) {
+				for (const cb of reprocessCancelledCallbacks) cb(event);
+			},
 		});
 	}
 
@@ -203,6 +226,12 @@ function createJobStore() {
 		sseConnected = false;
 		documentUpdateCallbacks.clear();
 		jobEventCallbacks.clear();
+		importProgressCallbacks.clear();
+		importCompletedCallbacks.clear();
+		importFailedCallbacks.clear();
+		reprocessProgressCallbacks.clear();
+		reprocessCompletedCallbacks.clear();
+		reprocessCancelledCallbacks.clear();
 	}
 
 	function onDocumentUpdated(callback: DocumentUpdatedCallback): () => void {
@@ -219,7 +248,64 @@ function createJobStore() {
 		};
 	}
 
-	return { subscribe, track, dismiss, clearCompleted, init, destroy, onDocumentUpdated, onJobEvent };
+	function onImportProgress(callback: ImportEventCallback): () => void {
+		importProgressCallbacks.add(callback);
+		return () => {
+			importProgressCallbacks.delete(callback);
+		};
+	}
+
+	function onImportCompleted(callback: ImportEventCallback): () => void {
+		importCompletedCallbacks.add(callback);
+		return () => {
+			importCompletedCallbacks.delete(callback);
+		};
+	}
+
+	function onImportFailed(callback: ImportEventCallback): () => void {
+		importFailedCallbacks.add(callback);
+		return () => {
+			importFailedCallbacks.delete(callback);
+		};
+	}
+
+	function onReprocessProgress(callback: ReprocessEventCallback): () => void {
+		reprocessProgressCallbacks.add(callback);
+		return () => {
+			reprocessProgressCallbacks.delete(callback);
+		};
+	}
+
+	function onReprocessCompleted(callback: ReprocessEventCallback): () => void {
+		reprocessCompletedCallbacks.add(callback);
+		return () => {
+			reprocessCompletedCallbacks.delete(callback);
+		};
+	}
+
+	function onReprocessCancelled(callback: ReprocessEventCallback): () => void {
+		reprocessCancelledCallbacks.add(callback);
+		return () => {
+			reprocessCancelledCallbacks.delete(callback);
+		};
+	}
+
+	return {
+		subscribe,
+		track,
+		dismiss,
+		clearCompleted,
+		init,
+		destroy,
+		onDocumentUpdated,
+		onJobEvent,
+		onImportProgress,
+		onImportCompleted,
+		onImportFailed,
+		onReprocessProgress,
+		onReprocessCompleted,
+		onReprocessCancelled,
+	};
 }
 
 export const jobStore = createJobStore();

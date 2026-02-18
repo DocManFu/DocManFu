@@ -13,7 +13,9 @@ class User(UUIDMixin, TimestampMixin, Base):
     username: Mapped[str] = mapped_column(String(150), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(20), default="user")  # admin, user, readonly
+    role: Mapped[str] = mapped_column(
+        String(20), default="user"
+    )  # admin, user, readonly
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     api_key: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, unique=True, index=True

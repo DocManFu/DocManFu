@@ -27,7 +27,7 @@
 		const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
 		return Math.min(
 			items.length,
-			Math.ceil((scrollOffset + viewportHeight) / itemHeight) + overscan
+			Math.ceil((scrollOffset + viewportHeight) / itemHeight) + overscan,
 		);
 	});
 

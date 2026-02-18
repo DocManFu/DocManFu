@@ -3,7 +3,7 @@ import type {
 	TagWithCount,
 	TagCreateRequest,
 	TagUpdateRequest,
-	TagMergeRequest
+	TagMergeRequest,
 } from '$lib/types/index.js';
 
 interface TagResponse {
@@ -19,14 +19,14 @@ export function listTags(): Promise<TagWithCount[]> {
 export function createTag(data: TagCreateRequest): Promise<TagResponse> {
 	return apiFetch<TagResponse>('/api/tags', {
 		method: 'POST',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 
 export function updateTag(id: string, data: TagUpdateRequest): Promise<TagResponse> {
 	return apiFetch<TagResponse>(`/api/tags/${id}`, {
 		method: 'PUT',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 
@@ -37,6 +37,6 @@ export function deleteTag(id: string): Promise<{ detail: string }> {
 export function mergeTags(data: TagMergeRequest): Promise<{ detail: string }> {
 	return apiFetch<{ detail: string }>('/api/tags/merge', {
 		method: 'POST',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }

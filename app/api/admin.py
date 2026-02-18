@@ -63,7 +63,9 @@ def list_users(
             User,
             func.count(Document.id).label("document_count"),
         )
-        .outerjoin(Document, (Document.user_id == User.id) & Document.deleted_at.is_(None))
+        .outerjoin(
+            Document, (Document.user_id == User.id) & Document.deleted_at.is_(None)
+        )
         .group_by(User.id)
         .order_by(User.created_at)
         .all()
@@ -91,9 +93,13 @@ def create_user(
 ):
     """Create a new user (admin-only, invite-only registration)."""
     if req.role not in ("admin", "user", "readonly"):
-        raise HTTPException(status_code=400, detail="Role must be admin, user, or readonly")
+        raise HTTPException(
+            status_code=400, detail="Role must be admin, user, or readonly"
+        )
     if len(req.password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        raise HTTPException(
+            status_code=400, detail="Password must be at least 8 characters"
+        )
 
     if db.query(User).filter(User.username == req.username).first():
         raise HTTPException(status_code=409, detail="Username already taken")
@@ -111,7 +117,12 @@ def create_user(
     db.commit()
     db.refresh(user)
 
-    logger.info("Admin '%s' created user '%s' with role '%s'", admin.username, user.username, user.role)
+    logger.info(
+        "Admin '%s' created user '%s' with role '%s'",
+        admin.username,
+        user.username,
+        user.role,
+    )
 
     return AdminUserResponse(
         id=user.id,
@@ -139,32 +150,50 @@ def update_user(
 
     if req.role is not None:
         if req.role not in ("admin", "user", "readonly"):
-            raise HTTPException(status_code=400, detail="Role must be admin, user, or readonly")
+            raise HTTPException(
+                status_code=400, detail="Role must be admin, user, or readonly"
+            )
         # Prevent removing last admin
         if user.role == "admin" and req.role != "admin":
-            admin_count = db.query(User).filter(User.role == "admin", User.is_active == True).count()
+            admin_count = (
+                db.query(User)
+                .filter(User.role == "admin", User.is_active == True)
+                .count()
+            )
             if admin_count <= 1:
-                raise HTTPException(status_code=400, detail="Cannot remove the last admin")
+                raise HTTPException(
+                    status_code=400, detail="Cannot remove the last admin"
+                )
         user.role = req.role
 
     if req.is_active is not None:
         if not req.is_active:
             # Can't deactivate yourself
             if user.id == admin.id:
-                raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
+                raise HTTPException(
+                    status_code=400, detail="Cannot deactivate yourself"
+                )
             # Can't deactivate last admin
             if user.role == "admin":
-                admin_count = db.query(User).filter(User.role == "admin", User.is_active == True).count()
+                admin_count = (
+                    db.query(User)
+                    .filter(User.role == "admin", User.is_active == True)
+                    .count()
+                )
                 if admin_count <= 1:
-                    raise HTTPException(status_code=400, detail="Cannot deactivate the last admin")
+                    raise HTTPException(
+                        status_code=400, detail="Cannot deactivate the last admin"
+                    )
         user.is_active = req.is_active
 
     db.commit()
     db.refresh(user)
 
-    doc_count = db.query(Document).filter(
-        Document.user_id == user.id, Document.deleted_at.is_(None)
-    ).count()
+    doc_count = (
+        db.query(Document)
+        .filter(Document.user_id == user.id, Document.deleted_at.is_(None))
+        .count()
+    )
 
     return AdminUserResponse(
         id=user.id,
@@ -193,9 +222,13 @@ def deactivate_user(
         raise HTTPException(status_code=400, detail="Cannot deactivate yourself")
 
     if user.role == "admin":
-        admin_count = db.query(User).filter(User.role == "admin", User.is_active == True).count()
+        admin_count = (
+            db.query(User).filter(User.role == "admin", User.is_active == True).count()
+        )
         if admin_count <= 1:
-            raise HTTPException(status_code=400, detail="Cannot deactivate the last admin")
+            raise HTTPException(
+                status_code=400, detail="Cannot deactivate the last admin"
+            )
 
     user.is_active = False
     db.commit()
@@ -217,10 +250,14 @@ def reset_user_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     if len(req.new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        raise HTTPException(
+            status_code=400, detail="Password must be at least 8 characters"
+        )
 
     user.hashed_password = hash_password(req.new_password)
     db.commit()
 
-    logger.info("Admin '%s' reset password for user '%s'", admin.username, user.username)
+    logger.info(
+        "Admin '%s' reset password for user '%s'", admin.username, user.username
+    )
     return {"detail": f"Password reset for user '{user.username}'"}

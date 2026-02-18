@@ -30,7 +30,7 @@ function createThemeStore() {
 				apply(next);
 				return next;
 			});
-		}
+		},
 	};
 }
 

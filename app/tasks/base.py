@@ -39,13 +39,17 @@ class DocManFuTask(Task):
             return str(doc.user_id)
         return None
 
-    def update_job_progress(self, job_id: str, progress: int, status: JobStatus | None = None):
+    def update_job_progress(
+        self, job_id: str, progress: int, status: JobStatus | None = None
+    ):
         """Persist progress (0-100) and optional status change."""
         db = self._get_db()
         try:
             job = db.get(ProcessingJob, job_id)
             if job is None:
-                logger.warning("ProcessingJob %s not found – skipping progress update", job_id)
+                logger.warning(
+                    "ProcessingJob %s not found – skipping progress update", job_id
+                )
                 return
             job.progress = min(progress, 100)
             if status is not None:
@@ -57,14 +61,17 @@ class DocManFuTask(Task):
             from app.core.events import publish_event
 
             user_id = self._get_doc_user_id(db, job.document_id)
-            publish_event("job.progress", {
-                "job_id": job_id,
-                "document_id": str(job.document_id),
-                "job_type": job.job_type.value,
-                "status": (status or job.status).value,
-                "progress": min(progress, 100),
-                "user_id": user_id,
-            })
+            publish_event(
+                "job.progress",
+                {
+                    "job_id": job_id,
+                    "document_id": str(job.document_id),
+                    "job_type": job.job_type.value,
+                    "status": (status or job.status).value,
+                    "progress": min(progress, 100),
+                    "user_id": user_id,
+                },
+            )
         finally:
             db.close()
 
@@ -83,14 +90,17 @@ class DocManFuTask(Task):
             from app.core.events import publish_event
 
             user_id = self._get_doc_user_id(db, job.document_id)
-            publish_event("job.started", {
-                "job_id": job_id,
-                "document_id": str(job.document_id),
-                "job_type": job.job_type.value,
-                "status": "processing",
-                "progress": 0,
-                "user_id": user_id,
-            })
+            publish_event(
+                "job.started",
+                {
+                    "job_id": job_id,
+                    "document_id": str(job.document_id),
+                    "job_type": job.job_type.value,
+                    "status": "processing",
+                    "progress": 0,
+                    "user_id": user_id,
+                },
+            )
         finally:
             db.close()
 
@@ -111,15 +121,18 @@ class DocManFuTask(Task):
             from app.core.events import publish_event
 
             user_id = self._get_doc_user_id(db, job.document_id)
-            publish_event("job.completed", {
-                "job_id": job_id,
-                "document_id": str(job.document_id),
-                "job_type": job.job_type.value,
-                "status": "completed",
-                "progress": 100,
-                "result_data": result_data,
-                "user_id": user_id,
-            })
+            publish_event(
+                "job.completed",
+                {
+                    "job_id": job_id,
+                    "document_id": str(job.document_id),
+                    "job_type": job.job_type.value,
+                    "status": "completed",
+                    "progress": 100,
+                    "result_data": result_data,
+                    "user_id": user_id,
+                },
+            )
         finally:
             db.close()
 
@@ -141,15 +154,18 @@ class DocManFuTask(Task):
             from app.core.events import publish_event
 
             user_id = self._get_doc_user_id(db, job.document_id)
-            publish_event("job.failed", {
-                "job_id": job_id,
-                "document_id": str(job.document_id),
-                "job_type": job.job_type.value,
-                "status": "failed",
-                "progress": job.progress,
-                "error_message": error_message,
-                "user_id": user_id,
-            })
+            publish_event(
+                "job.failed",
+                {
+                    "job_id": job_id,
+                    "document_id": str(job.document_id),
+                    "job_type": job.job_type.value,
+                    "status": "failed",
+                    "progress": job.progress,
+                    "error_message": error_message,
+                    "user_id": user_id,
+                },
+            )
         finally:
             db.close()
 

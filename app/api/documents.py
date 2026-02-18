@@ -162,7 +162,9 @@ class BulkReprocessRequest(BaseModel):
 
 
 def _get_document_or_404(db: Session, document_id: UUID, user: User) -> Document:
-    query = db.query(Document).filter(Document.id == document_id, Document.deleted_at.is_(None))
+    query = db.query(Document).filter(
+        Document.id == document_id, Document.deleted_at.is_(None)
+    )
     if user.role != "admin":
         query = query.filter(Document.user_id == user.id)
     doc = query.first()
@@ -179,9 +181,13 @@ def _get_document_or_404(db: Session, document_id: UUID, user: User) -> Document
 def search_documents(
     q: str = Query(..., min_length=1, description="Search query"),
     document_type: str | None = Query(None),
-    tag: str | None = Query(None, description="Filter by tag name (comma-separated for multiple)"),
+    tag: str | None = Query(
+        None, description="Filter by tag name (comma-separated for multiple)"
+    ),
     untagged: bool = Query(False, description="Show only documents with no tags"),
-    untyped: bool = Query(False, description="Show only documents with no document type"),
+    untyped: bool = Query(
+        False, description="Show only documents with no document type"
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -252,7 +258,9 @@ async def upload_document(
     ext = Path(original_name).suffix.lower()
     if ext not in ALLOWED_UPLOAD_TYPES:
         allowed = ", ".join(sorted(ALLOWED_UPLOAD_TYPES.keys()))
-        raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {allowed}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported file type. Allowed: {allowed}"
+        )
 
     # Validate MIME type (accept application/octet-stream as fallback for valid extensions)
     expected_mime = ALLOWED_UPLOAD_TYPES[ext]
@@ -282,7 +290,9 @@ async def upload_document(
 
     # Write file to disk
     abs_path.write_bytes(content)
-    logger.info("Stored file %s (%d bytes) at %s", original_name, len(content), abs_path)
+    logger.info(
+        "Stored file %s (%d bytes) at %s", original_name, len(content), abs_path
+    )
 
     # Create Document record
     doc = Document(
@@ -312,7 +322,12 @@ async def upload_document(
     job.celery_task_id = task.id
     db.commit()
 
-    logger.info("Dispatched OCR job %s (celery task %s) for document %s", job.id, task.id, doc.id)
+    logger.info(
+        "Dispatched OCR job %s (celery task %s) for document %s",
+        job.id,
+        task.id,
+        doc.id,
+    )
 
     return UploadResponse(
         id=doc.id,
@@ -328,12 +343,20 @@ async def upload_document(
 @router.get("", response_model=PaginatedResponse)
 def list_documents(
     document_type: str | None = Query(None, description="Filter by document type"),
-    tag: str | None = Query(None, description="Filter by tag name (comma-separated for multiple)"),
+    tag: str | None = Query(
+        None, description="Filter by tag name (comma-separated for multiple)"
+    ),
     untagged: bool = Query(False, description="Show only documents with no tags"),
-    untyped: bool = Query(False, description="Show only documents with no document type"),
-    date_from: datetime | None = Query(None, description="Filter from date (inclusive)"),
+    untyped: bool = Query(
+        False, description="Show only documents with no document type"
+    ),
+    date_from: datetime | None = Query(
+        None, description="Filter from date (inclusive)"
+    ),
     date_to: datetime | None = Query(None, description="Filter to date (inclusive)"),
-    sort_by: str = Query("upload_date", description="Sort field: upload_date, name, size, type"),
+    sort_by: str = Query(
+        "upload_date", description="Sort field: upload_date, name, size, type"
+    ),
     order: str = Query("desc", description="Sort order: asc or desc"),
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -372,12 +395,7 @@ def list_documents(
     query = query.order_by(sort_col.asc() if order == "asc" else sort_col.desc())
 
     total = query.count()
-    docs = (
-        query.options(selectinload(Document.tags))
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    docs = query.options(selectinload(Document.tags)).offset(offset).limit(limit).all()
 
     return PaginatedResponse(documents=docs, total=total, offset=offset, limit=limit)
 
@@ -431,7 +449,9 @@ def bulk_delete_documents(
 ):
     """Soft-delete multiple documents."""
     now = datetime.now(timezone.utc)
-    query = db.query(Document).filter(Document.id.in_(req.document_ids), Document.deleted_at.is_(None))
+    query = db.query(Document).filter(
+        Document.id.in_(req.document_ids), Document.deleted_at.is_(None)
+    )
     if user.role != "admin":
         query = query.filter(Document.user_id == user.id)
     count = query.update({Document.deleted_at: now}, synchronize_session="fetch")
@@ -446,7 +466,9 @@ def bulk_reprocess_documents(
     user: User = Depends(require_write_access),
 ):
     """Create OCR jobs for multiple documents."""
-    query = db.query(Document).filter(Document.id.in_(req.document_ids), Document.deleted_at.is_(None))
+    query = db.query(Document).filter(
+        Document.id.in_(req.document_ids), Document.deleted_at.is_(None)
+    )
     if user.role != "admin":
         query = query.filter(Document.user_id == user.id)
     docs = query.all()
@@ -503,30 +525,44 @@ def export_documents_csv(
     if date_to:
         query = query.filter(Document.upload_date <= date_to)
 
-    docs = query.options(selectinload(Document.tags)).order_by(Document.upload_date.desc()).all()
+    docs = (
+        query.options(selectinload(Document.tags))
+        .order_by(Document.upload_date.desc())
+        .all()
+    )
 
     def generate():
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow([
-            "id", "original_name", "ai_generated_name", "document_type",
-            "file_size", "upload_date", "processed_date", "tags",
-        ])
+        writer.writerow(
+            [
+                "id",
+                "original_name",
+                "ai_generated_name",
+                "document_type",
+                "file_size",
+                "upload_date",
+                "processed_date",
+                "tags",
+            ]
+        )
         yield output.getvalue()
         output.seek(0)
         output.truncate(0)
 
         for doc in docs:
-            writer.writerow([
-                str(doc.id),
-                doc.original_name,
-                doc.ai_generated_name or "",
-                doc.document_type or "",
-                doc.file_size,
-                doc.upload_date.isoformat() if doc.upload_date else "",
-                doc.processed_date.isoformat() if doc.processed_date else "",
-                "; ".join(t.name for t in doc.tags),
-            ])
+            writer.writerow(
+                [
+                    str(doc.id),
+                    doc.original_name,
+                    doc.ai_generated_name or "",
+                    doc.document_type or "",
+                    doc.file_size,
+                    doc.upload_date.isoformat() if doc.upload_date else "",
+                    doc.processed_date.isoformat() if doc.processed_date else "",
+                    "; ".join(t.name for t in doc.tags),
+                ]
+            )
             yield output.getvalue()
             output.seek(0)
             output.truncate(0)
@@ -586,14 +622,21 @@ def update_document(
             if doc.bill_status not in ("paid", "dismissed"):
                 doc.bill_status = "unpaid"
             # Parse due_date from ai_metadata (use updated or existing)
-            meta = update.ai_metadata if update.ai_metadata is not None else (doc.ai_metadata or {})
+            meta = (
+                update.ai_metadata
+                if update.ai_metadata is not None
+                else (doc.ai_metadata or {})
+            )
             raw_due = meta.get("due_date")
             if raw_due:
                 try:
                     doc.bill_due_date = date.fromisoformat(raw_due)
                 except (ValueError, TypeError):
                     pass
-        elif old_type in ("bill", "invoice") and update.document_type not in ("bill", "invoice"):
+        elif old_type in ("bill", "invoice") and update.document_type not in (
+            "bill",
+            "invoice",
+        ):
             # Changed away from bill — clear bill fields
             doc.bill_status = None
             doc.bill_due_date = None
@@ -606,7 +649,11 @@ def update_document(
     if update.tags is not None:
         new_tags = []
         for tag_name in update.tags:
-            tag = db.query(Tag).filter(Tag.name == tag_name, Tag.user_id == user.id).first()
+            tag = (
+                db.query(Tag)
+                .filter(Tag.name == tag_name, Tag.user_id == user.id)
+                .first()
+            )
             if not tag:
                 tag = Tag(name=tag_name, color="#6B7280", user_id=user.id)
                 db.add(tag)

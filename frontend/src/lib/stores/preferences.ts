@@ -18,7 +18,7 @@ function createViewModeStore() {
 		set(mode: ViewMode) {
 			if (browser) localStorage.setItem('viewMode', mode);
 			set(mode);
-		}
+		},
 	};
 }
 

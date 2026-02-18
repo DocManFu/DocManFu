@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: Check formatting (prettier)
-        run: npx prettier --check "src/**/*.{svelte,ts,js,css,html}"
+        run: ./node_modules/.bin/prettier --check "src/**/*.{svelte,ts,js,css,html}"
 
       - name: Type check (svelte-check)
         run: npm run check

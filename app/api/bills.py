@@ -58,7 +58,9 @@ class BillDueDateUpdate(BaseModel):
 
 @router.get("", response_model=BillsListResponse)
 def list_bills(
-    status: str = Query("unpaid", description="Filter by bill status: unpaid, paid, dismissed, all"),
+    status: str = Query(
+        "unpaid", description="Filter by bill status: unpaid, paid, dismissed, all"
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -78,7 +80,9 @@ def list_bills(
 
     total = query.count()
     bills = (
-        query.order_by(nulls_last(Document.bill_due_date.asc()), Document.upload_date.desc())
+        query.order_by(
+            nulls_last(Document.bill_due_date.asc()), Document.upload_date.desc()
+        )
         .offset(offset)
         .limit(limit)
         .all()
@@ -96,9 +100,13 @@ def update_bill_status(
 ):
     """Set bill status to paid, dismissed, or unpaid."""
     if body.status not in ("paid", "dismissed", "unpaid"):
-        raise HTTPException(status_code=400, detail="Status must be 'paid', 'dismissed', or 'unpaid'")
+        raise HTTPException(
+            status_code=400, detail="Status must be 'paid', 'dismissed', or 'unpaid'"
+        )
 
-    query = db.query(Document).filter(Document.id == bill_id, Document.deleted_at.is_(None))
+    query = db.query(Document).filter(
+        Document.id == bill_id, Document.deleted_at.is_(None)
+    )
     if user.role != "admin":
         query = query.filter(Document.user_id == user.id)
     doc = query.first()
@@ -114,7 +122,11 @@ def update_bill_status(
 
     db.commit()
 
-    return {"detail": f"Bill status updated to '{body.status}'", "bill_status": doc.bill_status, "bill_paid_at": doc.bill_paid_at.isoformat() if doc.bill_paid_at else None}
+    return {
+        "detail": f"Bill status updated to '{body.status}'",
+        "bill_status": doc.bill_status,
+        "bill_paid_at": doc.bill_paid_at.isoformat() if doc.bill_paid_at else None,
+    }
 
 
 @router.patch("/{bill_id}/due-date")
@@ -125,7 +137,9 @@ def update_bill_due_date(
     user: User = Depends(require_write_access),
 ):
     """Manually set or clear the due date for a bill."""
-    query = db.query(Document).filter(Document.id == bill_id, Document.deleted_at.is_(None))
+    query = db.query(Document).filter(
+        Document.id == bill_id, Document.deleted_at.is_(None)
+    )
     if user.role != "admin":
         query = query.filter(Document.user_id == user.id)
     doc = query.first()
@@ -135,4 +149,7 @@ def update_bill_due_date(
     doc.bill_due_date = body.due_date
     db.commit()
 
-    return {"detail": "Due date updated", "bill_due_date": doc.bill_due_date.isoformat() if doc.bill_due_date else None}
+    return {
+        "detail": "Due date updated",
+        "bill_due_date": doc.bill_due_date.isoformat() if doc.bill_due_date else None,
+    }

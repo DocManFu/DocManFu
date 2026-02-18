@@ -29,7 +29,9 @@ def create_access_token(user_id: str, role: str) -> str:
         "type": "access",
         "exp": expire,
     }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
 
 
 def create_refresh_token(user_id: str) -> str:
@@ -41,13 +43,17 @@ def create_refresh_token(user_id: str) -> str:
         "type": "refresh",
         "exp": expire,
     }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
 
 
 def decode_token(token: str) -> dict | None:
     """Decode and verify a JWT. Returns the payload dict or None on error."""
     try:
-        return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        return jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
     except JWTError:
         return None
 

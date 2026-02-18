@@ -15,7 +15,7 @@ function createAuthStore() {
 		user: null,
 		accessToken: null,
 		refreshToken: null,
-		initialized: false
+		initialized: false,
 	});
 
 	function login(data: { access_token: string; refresh_token: string; user: User }) {
@@ -23,7 +23,7 @@ function createAuthStore() {
 			user: data.user,
 			accessToken: data.access_token,
 			refreshToken: data.refresh_token,
-			initialized: true
+			initialized: true,
 		};
 		set(state);
 		try {
@@ -38,7 +38,7 @@ function createAuthStore() {
 			user: null,
 			accessToken: null,
 			refreshToken: null,
-			initialized: true
+			initialized: true,
 		};
 		set(state);
 		try {
@@ -54,7 +54,7 @@ function createAuthStore() {
 				...s,
 				accessToken,
 				refreshToken,
-				user: user ?? s.user
+				user: user ?? s.user,
 			};
 			try {
 				localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));

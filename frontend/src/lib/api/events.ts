@@ -17,6 +17,44 @@ export interface DocumentUpdatedEvent {
 	changes: string[];
 }
 
+export interface ImportEvent {
+	task_id: string;
+	user_id: string;
+	filename: string;
+	current: number;
+	total: number;
+	imported: number;
+	documents_created: number;
+	current_note?: string;
+	status: string;
+	// Present on completed/failed:
+	total_notes?: number;
+	imported_notes?: number;
+	errors?: number;
+	skipped?: Array<{
+		title: string;
+		reason: string;
+		created: string;
+		tags: string[];
+		resources: Array<{ mime: string; filename: string | null; reason: string }>;
+	}>;
+	error_list?: Array<{ title: string; error: string }>;
+}
+
+export interface ReprocessEvent {
+	task_id: string;
+	user_id: string;
+	current: number;
+	total: number;
+	succeeded: number;
+	failed: number;
+	skipped: number;
+	current_document?: string;
+	paused?: boolean;
+	status: string;
+	errors?: Array<{ document: string; error: string }>;
+}
+
 export interface SSEHandlers {
 	onConnected?: () => void;
 	onDisconnected?: () => void;
@@ -25,6 +63,12 @@ export interface SSEHandlers {
 	onJobCompleted?: (data: JobEvent) => void;
 	onJobFailed?: (data: JobEvent) => void;
 	onDocumentUpdated?: (data: DocumentUpdatedEvent) => void;
+	onImportProgress?: (data: ImportEvent) => void;
+	onImportCompleted?: (data: ImportEvent) => void;
+	onImportFailed?: (data: ImportEvent) => void;
+	onReprocessProgress?: (data: ReprocessEvent) => void;
+	onReprocessCompleted?: (data: ReprocessEvent) => void;
+	onReprocessCancelled?: (data: ReprocessEvent) => void;
 }
 
 let eventSource: EventSource | null = null;
@@ -89,6 +133,30 @@ export function connectSSE(handlers: SSEHandlers): void {
 
 	eventSource.addEventListener('document.updated', (e) => {
 		handlers.onDocumentUpdated?.(JSON.parse((e as MessageEvent).data));
+	});
+
+	eventSource.addEventListener('import.progress', (e) => {
+		handlers.onImportProgress?.(JSON.parse((e as MessageEvent).data));
+	});
+
+	eventSource.addEventListener('import.completed', (e) => {
+		handlers.onImportCompleted?.(JSON.parse((e as MessageEvent).data));
+	});
+
+	eventSource.addEventListener('import.failed', (e) => {
+		handlers.onImportFailed?.(JSON.parse((e as MessageEvent).data));
+	});
+
+	eventSource.addEventListener('reprocess.progress', (e) => {
+		handlers.onReprocessProgress?.(JSON.parse((e as MessageEvent).data));
+	});
+
+	eventSource.addEventListener('reprocess.completed', (e) => {
+		handlers.onReprocessCompleted?.(JSON.parse((e as MessageEvent).data));
+	});
+
+	eventSource.addEventListener('reprocess.cancelled', (e) => {
+		handlers.onReprocessCancelled?.(JSON.parse((e as MessageEvent).data));
 	});
 
 	eventSource.onerror = () => {

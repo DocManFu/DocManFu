@@ -134,7 +134,7 @@
 		<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Tags</h1>
 		<button
 			class="btn-secondary btn-sm"
-			onclick={() => mergeMode ? exitMergeMode() : (mergeMode = true)}
+			onclick={() => (mergeMode ? exitMergeMode() : (mergeMode = true))}
 		>
 			<span class="i-lucide-git-merge mr-1"></span>
 			{mergeMode ? 'Cancel Merge' : 'Merge Tags'}
@@ -157,7 +157,11 @@
 				class="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
 				bind:value={newColor}
 			/>
-			<button class="btn-primary btn-sm" onclick={handleCreate} disabled={creating || !newName.trim()}>
+			<button
+				class="btn-primary btn-sm"
+				onclick={handleCreate}
+				disabled={creating || !newName.trim()}
+			>
 				<span class="i-lucide-plus mr-1"></span>Create
 			</button>
 		</div>
@@ -174,7 +178,9 @@
 	{:else}
 		{#if mergeMode && mergeSelected.size >= 2}
 			<div class="card p-4 mb-4">
-				<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select target tag to merge into:</h3>
+				<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+					Select target tag to merge into:
+				</h3>
 				<div class="flex flex-wrap gap-2">
 					{#each tags.filter((t) => mergeSelected.has(t.id)) as t (t.id)}
 						<button
@@ -196,7 +202,9 @@
 
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each tags as tag (tag.id)}
-				<div class="card p-4 {mergeMode && mergeSelected.has(tag.id) ? 'ring-2 ring-brand-500' : ''}">
+				<div
+					class="card p-4 {mergeMode && mergeSelected.has(tag.id) ? 'ring-2 ring-brand-500' : ''}"
+				>
 					{#if editingId === tag.id}
 						<div class="space-y-3">
 							<input
@@ -224,7 +232,9 @@
 								{#if mergeMode}
 									<button
 										class="w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 cursor-pointer
-											{mergeSelected.has(tag.id) ? 'bg-brand-600 border-brand-600' : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600'}"
+											{mergeSelected.has(tag.id)
+											? 'bg-brand-600 border-brand-600'
+											: 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600'}"
 										onclick={() => toggleMergeSelect(tag.id)}
 									>
 										{#if mergeSelected.has(tag.id)}
@@ -236,7 +246,9 @@
 									class="w-4 h-4 rounded-full flex-shrink-0"
 									style="background-color: {tag.color};"
 								></span>
-								<span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{tag.name}</span>
+								<span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
+									>{tag.name}</span
+								>
 								<span class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
 									{tag.document_count} doc{tag.document_count === 1 ? '' : 's'}
 								</span>
@@ -244,11 +256,7 @@
 
 							{#if !mergeMode}
 								<div class="flex items-center gap-1">
-									<button
-										class="btn-icon"
-										title="Edit tag"
-										onclick={() => startEdit(tag)}
-									>
+									<button class="btn-icon" title="Edit tag" onclick={() => startEdit(tag)}>
 										<span class="i-lucide-pencil text-sm"></span>
 									</button>
 									<button

@@ -11,7 +11,7 @@ export function formatDate(dateStr: string): string {
 	return date.toLocaleDateString('en-US', {
 		year: 'numeric',
 		month: 'short',
-		day: 'numeric'
+		day: 'numeric',
 	});
 }
 

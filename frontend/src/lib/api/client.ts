@@ -4,7 +4,7 @@ import { auth } from '$lib/stores/auth.js';
 export class ApiError extends Error {
 	constructor(
 		public status: number,
-		public detail: string
+		public detail: string,
 	) {
 		super(detail);
 		this.name = 'ApiError';
@@ -32,7 +32,7 @@ async function attemptTokenRefresh(): Promise<boolean> {
 			const res = await fetch('/api/auth/refresh', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refresh_token: state.refreshToken })
+				body: JSON.stringify({ refresh_token: state.refreshToken }),
 			});
 
 			if (!res.ok) return false;
@@ -56,8 +56,8 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 		headers: {
 			'Content-Type': 'application/json',
 			...getAuthHeader(),
-			...options?.headers
-		}
+			...options?.headers,
+		},
 	});
 
 	if (res.status === 401) {
@@ -69,8 +69,8 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 				headers: {
 					'Content-Type': 'application/json',
 					...getAuthHeader(),
-					...options?.headers
-				}
+					...options?.headers,
+				},
 			});
 			if (retryRes.ok) {
 				if (retryRes.status === 204) return undefined as T;
@@ -139,6 +139,87 @@ export async function apiDownload(path: string, fallbackFilename: string): Promi
 	URL.revokeObjectURL(url);
 }
 
+export async function apiUploadWithProgress<T>(
+	path: string,
+	file: File,
+	onProgress?: (loaded: number, total: number) => void,
+): Promise<T> {
+	const formData = new FormData();
+	formData.append('file', file);
+
+	return new Promise((resolve, reject) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open('POST', path);
+
+		const headers = getAuthHeader();
+		for (const [key, value] of Object.entries(headers)) {
+			xhr.setRequestHeader(key, value);
+		}
+
+		xhr.upload.onprogress = (e) => {
+			if (e.lengthComputable && onProgress) {
+				onProgress(e.loaded, e.total);
+			}
+		};
+
+		xhr.onload = () => {
+			if (xhr.status >= 200 && xhr.status < 300) {
+				try {
+					resolve(JSON.parse(xhr.responseText));
+				} catch {
+					reject(new ApiError(xhr.status, 'Invalid JSON response'));
+				}
+			} else if (xhr.status === 401) {
+				attemptTokenRefresh().then((refreshed) => {
+					if (refreshed) {
+						// Retry with new token
+						const retryXhr = new XMLHttpRequest();
+						retryXhr.open('POST', path);
+						const newHeaders = getAuthHeader();
+						for (const [key, value] of Object.entries(newHeaders)) {
+							retryXhr.setRequestHeader(key, value);
+						}
+						retryXhr.upload.onprogress = (e) => {
+							if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total);
+						};
+						retryXhr.onload = () => {
+							if (retryXhr.status >= 200 && retryXhr.status < 300) {
+								try {
+									resolve(JSON.parse(retryXhr.responseText));
+								} catch {
+									reject(new ApiError(retryXhr.status, 'Invalid JSON'));
+								}
+							} else {
+								reject(new ApiError(retryXhr.status, 'Upload failed after retry'));
+							}
+						};
+						retryXhr.onerror = () => reject(new ApiError(0, 'Network error'));
+						const retryForm = new FormData();
+						retryForm.append('file', file);
+						retryXhr.send(retryForm);
+					} else {
+						auth.logout();
+						if (typeof window !== 'undefined') window.location.href = '/auth/login';
+						reject(new ApiError(401, 'Session expired'));
+					}
+				});
+			} else {
+				let detail = `Upload failed with status ${xhr.status}`;
+				try {
+					const body = JSON.parse(xhr.responseText);
+					if (body.detail) detail = body.detail;
+				} catch {
+					/* use default */
+				}
+				reject(new ApiError(xhr.status, detail));
+			}
+		};
+
+		xhr.onerror = () => reject(new ApiError(0, 'Network error'));
+		xhr.send(formData);
+	});
+}
+
 export async function apiUpload<T>(path: string, file: File): Promise<T> {
 	const formData = new FormData();
 	formData.append('file', file);
@@ -146,7 +227,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
 	const res = await fetch(path, {
 		method: 'POST',
 		headers: getAuthHeader(),
-		body: formData
+		body: formData,
 	});
 
 	if (res.status === 401) {
@@ -155,7 +236,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
 			const retryRes = await fetch(path, {
 				method: 'POST',
 				headers: getAuthHeader(),
-				body: formData
+				body: formData,
 			});
 			if (retryRes.ok) return retryRes.json();
 		}

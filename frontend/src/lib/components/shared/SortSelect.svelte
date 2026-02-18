@@ -11,7 +11,7 @@
 		{ value: 'upload_date', label: 'Upload Date' },
 		{ value: 'name', label: 'Name' },
 		{ value: 'size', label: 'Size' },
-		{ value: 'type', label: 'Type' }
+		{ value: 'type', label: 'Type' },
 	];
 </script>
 

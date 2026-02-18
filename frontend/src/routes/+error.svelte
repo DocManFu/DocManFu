@@ -11,8 +11,6 @@
 		<p class="text-gray-600 mb-6">
 			{$page.error?.message ?? 'Something went wrong'}
 		</p>
-		<a href="/documents" class="btn-primary no-underline">
-			Go to Documents
-		</a>
+		<a href="/documents" class="btn-primary no-underline"> Go to Documents </a>
 	</div>
 </div>

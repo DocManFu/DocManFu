@@ -52,21 +52,29 @@
 		<div class="w-full max-w-sm">
 			<div class="text-center mb-8">
 				<div class="flex items-center justify-center gap-2 text-2xl font-bold text-brand-600 mb-2">
-					<span class="i-lucide-folder-open text-3xl"></span>
+					<img src="/icons/favicon-96x96.png" alt="DocManFu" class="w-8 h-8" />
 					DocManFu
 				</div>
 				<p class="text-gray-500 dark:text-gray-400">Sign in to your account</p>
 			</div>
 
-			<form onsubmit={handleSubmit} class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700">
+			<form
+				onsubmit={handleSubmit}
+				class="bg-white dark:bg-gray-800 shadow-sm rounded-xl p-6 space-y-4 border border-gray-200 dark:border-gray-700"
+			>
 				{#if error}
-					<div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
+					<div
+						class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm"
+					>
 						{error}
 					</div>
 				{/if}
 
 				<div>
-					<label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+					<label
+						for="username"
+						class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+					>
 						Username or Email
 					</label>
 					<input
@@ -80,7 +88,10 @@
 				</div>
 
 				<div>
-					<label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+					<label
+						for="password"
+						class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+					>
 						Password
 					</label>
 					<input

@@ -10,7 +10,7 @@ import type {
 	SearchDocumentsParams,
 	BulkTagRequest,
 	BulkDeleteRequest,
-	BulkReprocessRequest
+	BulkReprocessRequest,
 } from '$lib/types/index.js';
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
@@ -34,7 +34,7 @@ export function getDocument(id: string): Promise<DocumentDetail> {
 export function updateDocument(id: string, data: DocumentUpdateRequest): Promise<DocumentDetail> {
 	return apiFetch<DocumentDetail>(`/api/documents/${id}`, {
 		method: 'PUT',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 
@@ -59,21 +59,23 @@ export function getDownloadUrl(id: string): string {
 export function bulkTagDocuments(data: BulkTagRequest): Promise<{ detail: string }> {
 	return apiFetch<{ detail: string }>('/api/documents/bulk/tag', {
 		method: 'POST',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 
 export function bulkDeleteDocuments(data: BulkDeleteRequest): Promise<{ detail: string }> {
 	return apiFetch<{ detail: string }>('/api/documents/bulk/delete', {
 		method: 'POST',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 
-export function bulkReprocessDocuments(data: BulkReprocessRequest): Promise<{ detail: string; jobs: Array<{ job_id: string; document_id: string }> }> {
+export function bulkReprocessDocuments(
+	data: BulkReprocessRequest,
+): Promise<{ detail: string; jobs: Array<{ job_id: string; document_id: string }> }> {
 	return apiFetch('/api/documents/bulk/reprocess', {
 		method: 'POST',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 

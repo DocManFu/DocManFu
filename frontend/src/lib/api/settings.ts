@@ -8,19 +8,19 @@ export async function getAISettings(): Promise<AISettings> {
 export async function updateAISettings(data: AISettingsUpdate): Promise<AISettings> {
 	return apiFetch('/api/admin/settings/ai', {
 		method: 'PUT',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 
 export async function testAIConnection(data: AISettingsUpdate): Promise<TestConnectionResult> {
 	return apiFetch('/api/admin/settings/ai/test', {
 		method: 'POST',
-		body: JSON.stringify(data)
+		body: JSON.stringify(data),
 	});
 }
 
 export async function resetAISettings(): Promise<{ detail: string }> {
 	return apiFetch('/api/admin/settings/ai', {
-		method: 'DELETE'
+		method: 'DELETE',
 	});
 }

@@ -13,7 +13,7 @@
 		'legal',
 		'correspondence',
 		'report',
-		'other'
+		'other',
 	] as const;
 
 	interface Props {
@@ -45,9 +45,15 @@
 		{ label: 'Size', value: formatFileSize(doc.file_size), icon: 'i-lucide-hard-drive' },
 		{ label: 'Uploaded', value: formatDate(doc.upload_date), icon: 'i-lucide-calendar' },
 		...(doc.processed_date
-			? [{ label: 'Processed', value: formatDate(doc.processed_date), icon: 'i-lucide-check-circle' }]
+			? [
+					{
+						label: 'Processed',
+						value: formatDate(doc.processed_date),
+						icon: 'i-lucide-check-circle',
+					},
+				]
 			: []),
-		{ label: 'MIME', value: doc.mime_type, icon: 'i-lucide-file-type' }
+		{ label: 'MIME', value: doc.mime_type, icon: 'i-lucide-file-type' },
 	]);
 
 	let aiMeta = $derived(doc.ai_metadata as Record<string, unknown> | null);
@@ -80,7 +86,7 @@
 
 			await onupdate({
 				document_type: editType || undefined,
-				ai_metadata: updatedMeta
+				ai_metadata: updatedMeta,
 			});
 			editing = false;
 		} finally {
@@ -119,7 +125,9 @@
 			{#if editing}
 				<div class="space-y-3 text-sm">
 					<div>
-						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-doc-type">Document Type</label>
+						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-doc-type"
+							>Document Type</label
+						>
 						<select id="edit-doc-type" class="input-base w-full" bind:value={editType}>
 							<option value="">Unknown</option>
 							{#each DOCUMENT_TYPES as t}
@@ -128,26 +136,51 @@
 						</select>
 					</div>
 					<div>
-						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-company">Company</label>
-						<input id="edit-company" type="text" class="input-base w-full" bind:value={editCompany} />
+						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-company"
+							>Company</label
+						>
+						<input
+							id="edit-company"
+							type="text"
+							class="input-base w-full"
+							bind:value={editCompany}
+						/>
 					</div>
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-date">Date</label>
+							<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-date">Date</label
+							>
 							<input id="edit-date" type="text" class="input-base w-full" bind:value={editDate} />
 						</div>
 						<div>
-							<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-amount">Amount</label>
-							<input id="edit-amount" type="text" class="input-base w-full" bind:value={editAmount} />
+							<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-amount"
+								>Amount</label
+							>
+							<input
+								id="edit-amount"
+								type="text"
+								class="input-base w-full"
+								bind:value={editAmount}
+							/>
 						</div>
 					</div>
 					<div>
-						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-account">Account</label>
-						<input id="edit-account" type="text" class="input-base w-full" bind:value={editAccount} />
+						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-account"
+							>Account</label
+						>
+						<input
+							id="edit-account"
+							type="text"
+							class="input-base w-full"
+							bind:value={editAccount}
+						/>
 					</div>
 					<div>
-						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-summary">Summary</label>
-						<textarea id="edit-summary" class="input-base w-full" rows="3" bind:value={editSummary}></textarea>
+						<label class="block text-gray-500 dark:text-gray-400 mb-1" for="edit-summary"
+							>Summary</label
+						>
+						<textarea id="edit-summary" class="input-base w-full" rows="3" bind:value={editSummary}
+						></textarea>
 					</div>
 					<div class="flex items-center gap-2 pt-1">
 						<button class="btn-primary btn-sm" onclick={saveEdit} disabled={saving}>
@@ -179,7 +212,9 @@
 					{#if aiMeta?.account_number}
 						<div>
 							<div class="text-gray-500 dark:text-gray-400">Account</div>
-							<div class="text-gray-900 dark:text-gray-100 font-medium">{aiMeta.account_number}</div>
+							<div class="text-gray-900 dark:text-gray-100 font-medium">
+								{aiMeta.account_number}
+							</div>
 						</div>
 					{/if}
 					{#if aiMeta?.summary}

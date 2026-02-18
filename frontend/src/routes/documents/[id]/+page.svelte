@@ -9,11 +9,15 @@
 		deleteDocument,
 		reprocessDocument,
 		getDownloadUrl,
-		downloadDocument
+		downloadDocument,
 	} from '$lib/api/documents.js';
 	import { updateBillStatus, updateBillDueDate } from '$lib/api/bills.js';
 	import { getDocumentJobHistory } from '$lib/api/jobs.js';
-	import type { DocumentDetail, DocumentUpdateRequest, JobStatusResponse } from '$lib/types/index.js';
+	import type {
+		DocumentDetail,
+		DocumentUpdateRequest,
+		JobStatusResponse,
+	} from '$lib/types/index.js';
 	import DocumentMeta from '$lib/components/documents/DocumentMeta.svelte';
 	import PdfPreview from '$lib/components/documents/PdfPreview.svelte';
 	import TagInput from '$lib/components/tags/TagInput.svelte';
@@ -76,7 +80,9 @@
 		}
 	});
 
-	let isBill = $derived(doc?.document_type === 'bill' || doc?.document_type === 'invoice' || !!doc?.bill_status);
+	let isBill = $derived(
+		doc?.document_type === 'bill' || doc?.document_type === 'invoice' || !!doc?.bill_status,
+	);
 
 	let displayName = $derived(doc?.ai_generated_name || doc?.original_name || '');
 
@@ -241,20 +247,44 @@
 
 	function formatJobType(type: string): string {
 		switch (type) {
-			case 'ocr': return 'OCR';
-			case 'ai_analysis': return 'AI Analysis';
-			case 'file_organization': return 'File Organization';
-			default: return type;
+			case 'ocr':
+				return 'OCR';
+			case 'ai_analysis':
+				return 'AI Analysis';
+			case 'file_organization':
+				return 'File Organization';
+			default:
+				return type;
 		}
 	}
 
 	function formatJobStatus(status: string): { label: string; classes: string } {
 		switch (status) {
-			case 'completed': return { label: 'Completed', classes: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' };
-			case 'failed': return { label: 'Failed', classes: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' };
-			case 'processing': return { label: 'Processing', classes: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' };
-			case 'pending': return { label: 'Pending', classes: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
-			default: return { label: status, classes: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400' };
+			case 'completed':
+				return {
+					label: 'Completed',
+					classes: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+				};
+			case 'failed':
+				return {
+					label: 'Failed',
+					classes: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+				};
+			case 'processing':
+				return {
+					label: 'Processing',
+					classes: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+				};
+			case 'pending':
+				return {
+					label: 'Pending',
+					classes: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+				};
+			default:
+				return {
+					label: status,
+					classes: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+				};
 		}
 	}
 
@@ -297,8 +327,13 @@
 {:else if doc}
 	<div class="flex h-[calc(100vh-4rem)]">
 		<!-- Left sidebar: metadata -->
-		<div class="w-sm flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-900">
-			<a href={backUrl} class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 no-underline">
+		<div
+			class="w-sm flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-900"
+		>
+			<a
+				href={backUrl}
+				class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 no-underline"
+			>
 				<span class="i-lucide-arrow-left"></span>
 				Back to documents
 			</a>
@@ -315,12 +350,16 @@
 								bind:value={editAiName}
 								onkeydown={handleAiNameKeydown}
 							/>
-							<button class="btn-primary btn-sm" onclick={saveAiName} disabled={savingAiName}>Save</button>
+							<button class="btn-primary btn-sm" onclick={saveAiName} disabled={savingAiName}
+								>Save</button
+							>
 							<button class="btn-ghost btn-sm" onclick={cancelEditAiName}>Cancel</button>
 						</div>
 					{:else}
 						<div class="flex items-center gap-1 group">
-							<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">{doc.ai_generated_name}</h1>
+							<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">
+								{doc.ai_generated_name}
+							</h1>
 							<button
 								class="btn-icon opacity-0 group-hover:opacity-100 flex-shrink-0"
 								title="Edit AI name"
@@ -369,7 +408,9 @@
 						</div>
 					{:else}
 						<div class="flex items-center gap-1 group">
-							<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">{doc.original_name}</h1>
+							<h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 break-words">
+								{doc.original_name}
+							</h1>
 							<button
 								class="btn-icon opacity-0 group-hover:opacity-100 flex-shrink-0"
 								title="Edit name"
@@ -390,18 +431,11 @@
 				>
 					<span class="i-lucide-download mr-1"></span>Download
 				</button>
-				<button
-					class="btn-secondary btn-sm"
-					onclick={handleReprocess}
-					disabled={reprocessing}
-				>
+				<button class="btn-secondary btn-sm" onclick={handleReprocess} disabled={reprocessing}>
 					<span class="i-lucide-refresh-cw mr-1 {reprocessing ? 'animate-spin' : ''}"></span>
 					Reprocess
 				</button>
-				<button
-					class="btn-danger btn-sm"
-					onclick={() => (showDeleteDialog = true)}
-				>
+				<button class="btn-danger btn-sm" onclick={() => (showDeleteDialog = true)}>
 					<span class="i-lucide-trash-2 mr-1"></span>Delete
 				</button>
 			</div>
@@ -409,7 +443,9 @@
 			<!-- Bill Status -->
 			{#if isBill}
 				<div class="card p-4">
-					<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
+					<h3
+						class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1"
+					>
 						<span class="i-lucide-receipt"></span>
 						Bill Info
 					</h3>
@@ -417,11 +453,20 @@
 						<div class="flex items-center justify-between">
 							<span class="text-gray-500 dark:text-gray-400">Status</span>
 							{#if doc.bill_status === 'unpaid'}
-								<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Unpaid</span>
+								<span
+									class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+									>Unpaid</span
+								>
 							{:else if doc.bill_status === 'paid'}
-								<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Paid</span>
+								<span
+									class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+									>Paid</span
+								>
 							{:else if doc.bill_status === 'dismissed'}
-								<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Dismissed</span>
+								<span
+									class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+									>Dismissed</span
+								>
 							{:else}
 								<span class="text-gray-400">—</span>
 							{/if}
@@ -434,14 +479,25 @@
 										type="date"
 										class="input-base text-sm w-36"
 										bind:value={editDueDate}
-										onkeydown={(e) => { if (e.key === 'Enter') handleDueDateSave(); if (e.key === 'Escape') editingDueDate = false; }}
+										onkeydown={(e) => {
+											if (e.key === 'Enter') handleDueDateSave();
+											if (e.key === 'Escape') editingDueDate = false;
+										}}
 									/>
-									<button class="btn-primary btn-sm" onclick={handleDueDateSave} disabled={updatingBill}>Save</button>
-									<button class="btn-ghost btn-sm" onclick={() => editingDueDate = false}>Cancel</button>
+									<button
+										class="btn-primary btn-sm"
+										onclick={handleDueDateSave}
+										disabled={updatingBill}>Save</button
+									>
+									<button class="btn-ghost btn-sm" onclick={() => (editingDueDate = false)}
+										>Cancel</button
+									>
 								</div>
 							{:else if doc.bill_due_date}
 								<span class="inline-flex items-center gap-1 group">
-									<span class="text-gray-900 dark:text-gray-100">{new Date(doc.bill_due_date).toLocaleDateString()}</span>
+									<span class="text-gray-900 dark:text-gray-100"
+										>{new Date(doc.bill_due_date).toLocaleDateString()}</span
+									>
 									<button
 										class="btn-icon opacity-0 group-hover:opacity-100"
 										title="Edit due date"
@@ -464,9 +520,19 @@
 							{@const payUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`}
 							<div class="flex items-center justify-between">
 								<span class="text-gray-500 dark:text-gray-400">Pay Online</span>
-								<a href={payUrl} target="_blank" rel="noopener noreferrer"
-									class="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm inline-flex items-center gap-1">
-									{(() => { try { return new URL(payUrl).hostname; } catch { return rawUrl; } })()}
+								<a
+									href={payUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm inline-flex items-center gap-1"
+								>
+									{(() => {
+										try {
+											return new URL(payUrl).hostname;
+										} catch {
+											return rawUrl;
+										}
+									})()}
 									<span class="i-lucide-external-link text-xs"></span>
 								</a>
 							</div>
@@ -474,20 +540,34 @@
 						{#if doc.bill_paid_at}
 							<div class="flex items-center justify-between">
 								<span class="text-gray-500 dark:text-gray-400">Paid</span>
-								<span class="text-gray-900 dark:text-gray-100">{new Date(doc.bill_paid_at).toLocaleDateString()}</span>
+								<span class="text-gray-900 dark:text-gray-100"
+									>{new Date(doc.bill_paid_at).toLocaleDateString()}</span
+								>
 							</div>
 						{/if}
 					</div>
 					<div class="flex flex-wrap gap-2 mt-3">
 						{#if doc.bill_status === 'unpaid'}
-							<button class="btn-primary btn-sm" onclick={() => handleBillStatus('paid')} disabled={updatingBill}>
+							<button
+								class="btn-primary btn-sm"
+								onclick={() => handleBillStatus('paid')}
+								disabled={updatingBill}
+							>
 								<span class="i-lucide-check mr-1"></span>Mark Paid
 							</button>
-							<button class="btn-ghost btn-sm" onclick={() => handleBillStatus('dismissed')} disabled={updatingBill}>
+							<button
+								class="btn-ghost btn-sm"
+								onclick={() => handleBillStatus('dismissed')}
+								disabled={updatingBill}
+							>
 								Not a Bill
 							</button>
 						{:else if doc.bill_status === 'paid' || doc.bill_status === 'dismissed'}
-							<button class="btn-secondary btn-sm" onclick={() => handleBillStatus('unpaid')} disabled={updatingBill}>
+							<button
+								class="btn-secondary btn-sm"
+								onclick={() => handleBillStatus('unpaid')}
+								disabled={updatingBill}
+							>
 								Mark Unpaid
 							</button>
 						{/if}
@@ -502,7 +582,9 @@
 
 			<!-- Tags -->
 			<div class="card p-4">
-				<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1">
+				<h3
+					class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1"
+				>
 					<span class="i-lucide-tags"></span>
 					Tags
 				</h3>
@@ -513,7 +595,9 @@
 			{#if doc.content_text}
 				<div class="card p-4">
 					<div class="flex items-center justify-between mb-3">
-						<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
+						<h3
+							class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1"
+						>
 							<span class="i-lucide-text"></span>
 							Extracted Text
 						</h3>
@@ -530,7 +614,8 @@
 							<span class="text-xs">{copied ? 'Copied!' : 'Copy'}</span>
 						</button>
 					</div>
-					<pre class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">{doc.content_text}</pre>
+					<pre
+						class="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">{doc.content_text}</pre>
 				</div>
 			{/if}
 
@@ -540,7 +625,9 @@
 					class="flex items-center gap-2 w-full text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
 					onclick={toggleProcessingLog}
 				>
-					<span class="{showProcessingLog ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'} text-xs"></span>
+					<span
+						class="{showProcessingLog ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'} text-xs"
+					></span>
 					<span class="i-lucide-activity"></span>
 					Processing Log
 				</button>
@@ -560,7 +647,11 @@
 										<span class="font-medium text-gray-900 dark:text-gray-100">
 											{formatJobType(job.job_type)}
 										</span>
-										<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {formatJobStatus(job.status).classes}">
+										<span
+											class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {formatJobStatus(
+												job.status,
+											).classes}"
+										>
 											{formatJobStatus(job.status).label}
 										</span>
 									</div>
@@ -571,7 +662,9 @@
 										{/if}
 									</div>
 									{#if job.error_message}
-										<div class="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2">
+										<div
+											class="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2"
+										>
 											{job.error_message}
 										</div>
 									{/if}
@@ -580,25 +673,33 @@
 											{#if job.result_data.document_type}
 												<div class="flex justify-between">
 													<span class="text-gray-500 dark:text-gray-400">Type</span>
-													<span class="text-gray-900 dark:text-gray-100 font-medium">{job.result_data.document_type}</span>
+													<span class="text-gray-900 dark:text-gray-100 font-medium"
+														>{job.result_data.document_type}</span
+													>
 												</div>
 											{/if}
 											{#if job.result_data.suggested_name}
 												<div class="flex justify-between gap-2">
 													<span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Name</span>
-													<span class="text-gray-900 dark:text-gray-100 font-medium text-right">{job.result_data.suggested_name}</span>
+													<span class="text-gray-900 dark:text-gray-100 font-medium text-right"
+														>{job.result_data.suggested_name}</span
+													>
 												</div>
 											{/if}
 											{#if job.result_data.confidence_score != null}
 												<div class="flex justify-between">
 													<span class="text-gray-500 dark:text-gray-400">Confidence</span>
-													<span class="text-gray-900 dark:text-gray-100 font-medium">{(Number(job.result_data.confidence_score) * 100).toFixed(0)}%</span>
+													<span class="text-gray-900 dark:text-gray-100 font-medium"
+														>{(Number(job.result_data.confidence_score) * 100).toFixed(0)}%</span
+													>
 												</div>
 											{/if}
 											{#if job.result_data.suggested_tags}
 												<div class="flex justify-between gap-2">
 													<span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Tags</span>
-													<span class="text-gray-900 dark:text-gray-100">{(job.result_data.suggested_tags as string[]).join(', ')}</span>
+													<span class="text-gray-900 dark:text-gray-100"
+														>{(job.result_data.suggested_tags as string[]).join(', ')}</span
+													>
 												</div>
 											{/if}
 											{#if job.result_data.vision_used}
@@ -614,13 +715,17 @@
 											{#if job.result_data.pages_processed}
 												<div class="flex justify-between">
 													<span class="text-gray-500 dark:text-gray-400">Pages</span>
-													<span class="text-gray-900 dark:text-gray-100 font-medium">{job.result_data.pages_processed}</span>
+													<span class="text-gray-900 dark:text-gray-100 font-medium"
+														>{job.result_data.pages_processed}</span
+													>
 												</div>
 											{/if}
 											{#if job.result_data.text_length}
 												<div class="flex justify-between">
 													<span class="text-gray-500 dark:text-gray-400">Text Length</span>
-													<span class="text-gray-900 dark:text-gray-100 font-medium">{Number(job.result_data.text_length).toLocaleString()} chars</span>
+													<span class="text-gray-900 dark:text-gray-100 font-medium"
+														>{Number(job.result_data.text_length).toLocaleString()} chars</span
+													>
 												</div>
 											{/if}
 										</div>
@@ -636,7 +741,9 @@
 		<!-- Right: document viewer -->
 		<div class="flex-1 min-w-0">
 			{#if doc.mime_type.startsWith('image/')}
-				<div class="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800 p-4 overflow-auto">
+				<div
+					class="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800 p-4 overflow-auto"
+				>
 					{#if imageBlobUrl}
 						<img
 							src={imageBlobUrl}

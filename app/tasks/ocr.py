@@ -122,7 +122,9 @@ def _ocr_image(task, job_id: str, input_path: Path) -> tuple[str | None, int]:
     extracted_text = extracted_text.strip()
 
     task.update_job_progress(job_id, 80, JobStatus.processing)
-    logger.info("Extracted %d characters from image %s", len(extracted_text), input_path.name)
+    logger.info(
+        "Extracted %d characters from image %s", len(extracted_text), input_path.name
+    )
 
     return extracted_text, 1
 
@@ -223,5 +225,7 @@ def _dispatch_ai_analysis(db, document_id: str):
             document_id,
         )
     except Exception as exc:
-        logger.error("Failed to dispatch AI analysis for document %s: %s", document_id, exc)
+        logger.error(
+            "Failed to dispatch AI analysis for document %s: %s", document_id, exc
+        )
         db.rollback()

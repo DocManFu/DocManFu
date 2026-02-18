@@ -26,7 +26,7 @@
 			status: 'uploading' as const,
 			progress: 0,
 			error: null,
-			jobId: null
+			jobId: null,
 		}));
 
 		uploads = [...uploads, ...newItems];
@@ -62,7 +62,9 @@
 		uploads = uploads.filter((u) => u.status !== 'completed' && u.status !== 'failed');
 	}
 
-	let hasCompleted = $derived(uploads.some((u) => u.status === 'completed' || u.status === 'failed'));
+	let hasCompleted = $derived(
+		uploads.some((u) => u.status === 'completed' || u.status === 'failed'),
+	);
 </script>
 
 <svelte:head>

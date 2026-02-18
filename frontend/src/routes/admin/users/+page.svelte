@@ -8,7 +8,7 @@
 		createUser,
 		updateUser,
 		deactivateUser,
-		resetUserPassword
+		resetUserPassword,
 	} from '$lib/api/auth.js';
 	import type { AdminUser } from '$lib/types/index.js';
 
@@ -122,6 +122,18 @@
 		>
 			Settings
 		</a>
+		<a
+			href="/admin/import"
+			class="px-4 py-2 text-sm font-medium no-underline border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+		>
+			Import
+		</a>
+		<a
+			href="/admin/processing"
+			class="px-4 py-2 text-sm font-medium no-underline border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+		>
+			Processing
+		</a>
 	</div>
 
 	<div class="flex items-center justify-between mb-6">
@@ -133,18 +145,26 @@
 	</div>
 
 	{#if showCreateForm}
-		<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6">
+		<div
+			class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6"
+		>
 			<h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Create New User</h2>
 			<form onsubmit={handleCreateUser} class="space-y-4">
 				{#if createError}
-					<div class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
+					<div
+						class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm"
+					>
 						{createError}
 					</div>
 				{/if}
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div>
-						<label for="new-username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+						<label
+							for="new-username"
+							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+							>Username</label
+						>
 						<input
 							id="new-username"
 							type="text"
@@ -154,7 +174,10 @@
 						/>
 					</div>
 					<div>
-						<label for="new-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+						<label
+							for="new-email"
+							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label
+						>
 						<input
 							id="new-email"
 							type="email"
@@ -164,7 +187,11 @@
 						/>
 					</div>
 					<div>
-						<label for="new-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+						<label
+							for="new-password"
+							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+							>Password</label
+						>
 						<input
 							id="new-password"
 							type="password"
@@ -175,7 +202,10 @@
 						/>
 					</div>
 					<div>
-						<label for="new-role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+						<label
+							for="new-role"
+							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label
+						>
 						<select
 							id="new-role"
 							bind:value={newRole}
@@ -208,15 +238,21 @@
 			<div class="i-lucide-loader-2 animate-spin text-2xl text-gray-400"></div>
 		</div>
 	{:else}
-		<div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+		<div
+			class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
+		>
 			<table class="w-full text-sm">
 				<thead>
 					<tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
 						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">User</th>
 						<th class="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Role</th>
 						<th class="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Docs</th>
-						<th class="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Status</th>
-						<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Actions</th>
+						<th class="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+							>Status</th
+						>
+						<th class="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400"
+							>Actions</th
+						>
 					</tr>
 				</thead>
 				<tbody>
@@ -237,14 +273,20 @@
 									<option value="readonly">Read Only</option>
 								</select>
 							</td>
-							<td class="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{user.document_count}</td>
+							<td class="px-4 py-3 text-center text-gray-600 dark:text-gray-400"
+								>{user.document_count}</td
+							>
 							<td class="px-4 py-3 text-center">
 								{#if user.is_active}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+									>
 										Active
 									</span>
 								{:else}
-									<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+									<span
+										class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+									>
 										Inactive
 									</span>
 								{/if}

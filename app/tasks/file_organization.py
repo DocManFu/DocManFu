@@ -26,7 +26,9 @@ def process_file_organization(self, job_id: str, document_id: str):
         document_id: Document UUID (string)
     """
     self.mark_job_started(job_id)
-    logger.info("Starting file organization for document %s (job %s)", document_id, job_id)
+    logger.info(
+        "Starting file organization for document %s (job %s)", document_id, job_id
+    )
 
     db = self._get_db()
     try:
@@ -44,7 +46,11 @@ def process_file_organization(self, job_id: str, document_id: str):
 
         # --- Phase 2: Rename / move file (stub) ---
         self.update_job_progress(job_id, 50, JobStatus.processing)
-        logger.info("File org stub: would rename %s to %s", document.filename, document.ai_generated_name)
+        logger.info(
+            "File org stub: would rename %s to %s",
+            document.filename,
+            document.ai_generated_name,
+        )
 
         # --- Phase 3: Verify and update DB (stub) ---
         self.update_job_progress(job_id, 80, JobStatus.processing)

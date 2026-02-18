@@ -105,7 +105,9 @@
 			description="Try a different search term or adjust your filters."
 		/>
 	{:else if documents.length > 0}
-		<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{total} result{total === 1 ? '' : 's'} for "{query}"</p>
+		<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+			{total} result{total === 1 ? '' : 's'} for "{query}"
+		</p>
 
 		<div class="space-y-3 mb-6">
 			{#each documents as doc (doc.id)}
@@ -114,7 +116,9 @@
 					class="card hover:shadow-md transition-shadow p-4 block no-underline text-inherit"
 				>
 					<div class="flex items-start gap-3">
-						<div class="flex-shrink-0 w-10 h-10 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center">
+						<div
+							class="flex-shrink-0 w-10 h-10 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center"
+						>
 							<span class="i-lucide-file-text text-brand-600 dark:text-brand-400"></span>
 						</div>
 						<div class="flex-1 min-w-0">

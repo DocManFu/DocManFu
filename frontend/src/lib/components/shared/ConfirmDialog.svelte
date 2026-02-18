@@ -16,7 +16,7 @@
 		confirmLabel = 'Confirm',
 		confirmClass = 'btn-danger',
 		onconfirm,
-		oncancel
+		oncancel,
 	}: Props = $props();
 </script>
 
