@@ -21,6 +21,7 @@
 	import LoadingSpinner from '$lib/components/shared/LoadingSpinner.svelte';
 	import { toasts } from '$lib/stores/toast.js';
 	import { jobStore } from '$lib/stores/jobs.js';
+	import { documentsListUrl } from '$lib/stores/preferences.js';
 
 	let doc = $state<DocumentDetail | null>(null);
 	let loading = $state(true);
@@ -57,6 +58,8 @@
 	let loadingJobs = $state(false);
 
 	let searchQuery = $derived($page.url.searchParams.get('q') ?? '');
+	let backUrl = $state('/documents');
+	documentsListUrl.subscribe((v) => (backUrl = v));
 	let imageBlobUrl = $state<string | null>(null);
 
 	$effect(() => {
@@ -162,7 +165,7 @@
 		try {
 			await deleteDocument(doc.id);
 			toasts.success('Document deleted');
-			goto('/documents');
+			goto(backUrl);
 		} catch (e) {
 			toasts.error(e instanceof Error ? e.message : 'Failed to delete document');
 		} finally {
@@ -288,14 +291,14 @@
 		<div class="text-center py-16">
 			<span class="i-lucide-alert-circle text-4xl text-red-400 mb-4 block mx-auto"></span>
 			<p class="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-			<a href="/documents" class="btn-primary no-underline">Back to Documents</a>
+			<a href={backUrl} class="btn-primary no-underline">Back to Documents</a>
 		</div>
 	</div>
 {:else if doc}
 	<div class="flex h-[calc(100vh-4rem)]">
 		<!-- Left sidebar: metadata -->
 		<div class="w-sm flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-900">
-			<a href="/documents" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 no-underline">
+			<a href={backUrl} class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 no-underline">
 				<span class="i-lucide-arrow-left"></span>
 				Back to documents
 			</a>

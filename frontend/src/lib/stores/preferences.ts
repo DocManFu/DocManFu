@@ -23,3 +23,6 @@ function createViewModeStore() {
 }
 
 export const viewMode = createViewModeStore();
+
+// Stores the documents list URL (with query params) so the detail page can link back with filters preserved
+export const documentsListUrl = writable<string>('/documents');

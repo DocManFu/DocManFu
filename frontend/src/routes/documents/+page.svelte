@@ -16,7 +16,7 @@
 	import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte';
 	import { toasts } from '$lib/stores/toast.js';
 	import { jobStore } from '$lib/stores/jobs.js';
-	import { viewMode } from '$lib/stores/preferences.js';
+	import { viewMode, documentsListUrl } from '$lib/stores/preferences.js';
 	import type { ViewMode } from '$lib/stores/preferences.js';
 
 	let documents = $state<DocumentListItem[]>([]);
@@ -122,7 +122,9 @@
 		loadingMore = true;
 		try {
 			const res = await listDocuments(buildApiParams(currentOffset));
-			documents = [...documents, ...res.documents];
+			const existingIds = new Set(documents.map((d) => d.id));
+			const newDocs = res.documents.filter((d) => !existingIds.has(d.id));
+			documents = [...documents, ...newDocs];
 			total = res.total;
 			currentOffset += res.documents.length;
 		} catch (e) {
@@ -133,7 +135,9 @@
 	}
 
 	function handleFilterChange() {
-		goto(buildUrl(), { replaceState: true, noScroll: true });
+		const url = buildUrl();
+		documentsListUrl.set(url);
+		goto(url, { replaceState: true, noScroll: true });
 		fetchDocuments();
 	}
 
@@ -236,6 +240,7 @@
 
 	onMount(() => {
 		syncFromUrl();
+		documentsListUrl.set(buildUrl());
 		fetchDocuments();
 		containerEl?.addEventListener('docnavigate', handleDocNavigate);
 		window.addEventListener('scroll', handleWindowScroll, { passive: true });
