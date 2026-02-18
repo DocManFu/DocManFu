@@ -1,7 +1,6 @@
 """Celery task for importing Evernote ENEX files."""
 
 import base64
-import io
 import logging
 import mimetypes
 import re

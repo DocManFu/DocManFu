@@ -3,7 +3,6 @@
 import logging
 
 from app.core.celery_app import celery_app
-from app.db.session import SessionLocal
 from app.models.document import Document
 from app.models.processing_job import JobStatus
 from app.tasks.base import DocManFuTask

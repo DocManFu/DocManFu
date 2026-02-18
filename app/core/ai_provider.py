@@ -153,8 +153,8 @@ def _load_ai_config() -> dict:
     Opens a short-lived DB session to read settings, then closes it.
     """
     try:
-        from app.db.session import SessionLocal
         from app.core.settings_service import get_ai_config
+        from app.db.session import SessionLocal
 
         db = SessionLocal()
         try:
@@ -441,7 +441,7 @@ def _parse_response(raw: str) -> AIAnalysisResult:
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")
         # Remove first and last lines (fences)
-        lines = [l for l in lines if not l.strip().startswith("```")]
+        lines = [line for line in lines if not line.strip().startswith("```")]
         cleaned = "\n".join(lines)
 
     data = json.loads(cleaned)

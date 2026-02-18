@@ -157,7 +157,7 @@ def update_user(
         if user.role == "admin" and req.role != "admin":
             admin_count = (
                 db.query(User)
-                .filter(User.role == "admin", User.is_active == True)
+                .filter(User.role == "admin", User.is_active)
                 .count()
             )
             if admin_count <= 1:
@@ -177,7 +177,7 @@ def update_user(
             if user.role == "admin":
                 admin_count = (
                     db.query(User)
-                    .filter(User.role == "admin", User.is_active == True)
+                    .filter(User.role == "admin", User.is_active)
                     .count()
                 )
                 if admin_count <= 1:
@@ -223,7 +223,7 @@ def deactivate_user(
 
     if user.role == "admin":
         admin_count = (
-            db.query(User).filter(User.role == "admin", User.is_active == True).count()
+            db.query(User).filter(User.role == "admin", User.is_active).count()
         )
         if admin_count <= 1:
             raise HTTPException(

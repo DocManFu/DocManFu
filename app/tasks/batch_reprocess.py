@@ -1,7 +1,6 @@
 """Celery task for batch reprocessing documents with pause/resume support."""
 
 import logging
-import uuid
 from pathlib import Path
 
 import redis
@@ -11,7 +10,6 @@ from app.core.config import settings
 from app.core.events import publish_event
 from app.core.search import update_search_vector
 from app.models.document import Document
-from app.models.processing_job import JobStatus, JobType, ProcessingJob
 from app.tasks.base import DocManFuTask
 
 logger = logging.getLogger(__name__)
@@ -382,6 +380,8 @@ def _process_image(db, doc: Document, abs_path: Path):
 
 def _run_ai_analysis(db, doc: Document):
     """Run AI analysis on a single document synchronously."""
+    from datetime import date
+
     from app.core.ai_provider import (
         _load_ai_config,
         analyze_document,
@@ -389,7 +389,6 @@ def _run_ai_analysis(db, doc: Document):
     )
     from app.core.search import update_search_vector
     from app.models.tag import Tag
-    from datetime import date
 
     text = doc.content_text
     pdf_path = Path(settings.UPLOAD_DIR) / doc.file_path
@@ -406,6 +405,7 @@ def _run_ai_analysis(db, doc: Document):
             if doc.mime_type and doc.mime_type.startswith("image/"):
                 import base64
                 import io
+
                 from PIL import Image
 
                 img = Image.open(str(pdf_path))

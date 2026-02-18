@@ -515,8 +515,8 @@
 								</button>
 							{/if}
 						</div>
-						{#if doc.ai_metadata?.payment_url}
-							{@const rawUrl = doc.ai_metadata.payment_url}
+						{#if doc.ai_metadata?.payment_url && typeof doc.ai_metadata.payment_url === 'string'}
+							{@const rawUrl = doc.ai_metadata.payment_url as string}
 							{@const payUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`}
 							<div class="flex items-center justify-between">
 								<span class="text-gray-500 dark:text-gray-400">Pay Online</span>
@@ -605,7 +605,7 @@
 							class="btn-ghost btn-sm flex items-center gap-1"
 							title="Copy text to clipboard"
 							onclick={() => {
-								navigator.clipboard.writeText(doc.content_text ?? '');
+								navigator.clipboard.writeText(doc?.content_text ?? '');
 								copied = true;
 								setTimeout(() => (copied = false), 2000);
 							}}

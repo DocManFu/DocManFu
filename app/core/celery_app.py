@@ -22,5 +22,5 @@ celery_app.conf.update(
 celery_app.autodiscover_tasks(["app.tasks"])
 
 # Explicitly import task modules that autodiscover doesn't find
-import app.tasks.import_evernote  # noqa: E402, F401
 import app.tasks.batch_reprocess  # noqa: E402, F401
+import app.tasks.import_evernote  # noqa: E402, F401

@@ -3,7 +3,7 @@
 from sqlalchemy import Boolean, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, UUIDMixin, TimestampMixin
+from app.db.base import Base, TimestampMixin, UUIDMixin
 
 
 class AppSetting(UUIDMixin, TimestampMixin, Base):

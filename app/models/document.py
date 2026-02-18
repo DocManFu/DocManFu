@@ -6,7 +6,7 @@ from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSON, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, UUIDMixin, TimestampMixin
+from app.db.base import Base, TimestampMixin, UUIDMixin
 
 
 class Document(UUIDMixin, TimestampMixin, Base):
@@ -55,6 +55,6 @@ class Document(UUIDMixin, TimestampMixin, Base):
 
 
 # Avoid circular import issues - these are resolved at runtime
-from app.models.tag import Tag  # noqa: E402
 from app.models.processing_job import ProcessingJob  # noqa: E402
+from app.models.tag import Tag  # noqa: E402
 from app.models.user import User  # noqa: E402

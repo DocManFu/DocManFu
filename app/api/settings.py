@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from app.core.auth import require_admin
 from app.core.settings_service import (
     delete_all_ai_settings,
-    get_all_ai_settings,
     get_ai_config,
+    get_all_ai_settings,
     set_ai_settings,
 )
 from app.db.deps import get_db

@@ -3,10 +3,9 @@
 import logging
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -219,7 +218,7 @@ def cancel_reprocess(
     admin: User = Depends(require_admin),
 ):
     """Cancel a running batch reprocess."""
-    from app.tasks.batch_reprocess import set_cancelled, set_active_task
+    from app.tasks.batch_reprocess import set_active_task, set_cancelled
 
     set_cancelled(task_id)
     # Clear active task immediately so UI unblocks (task will clean up on next iteration)
