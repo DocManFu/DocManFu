@@ -38,6 +38,7 @@ checksum:
 
 brews:
   - name: docmanfu
+    directory: Formula
     repository:
       owner: DocManFu
       name: homebrew-docmanfu
