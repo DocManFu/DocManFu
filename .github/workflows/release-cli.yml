@@ -19,6 +19,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: tools/docmanfu-watch/go.mod
+          cache-dependency-path: tools/docmanfu-watch/go.sum
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6

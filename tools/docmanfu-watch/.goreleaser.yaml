@@ -2,6 +2,9 @@ version: 2
 
 project_name: docmanfu
 
+monorepo:
+  tag_prefix: "cli/"
+
 before:
   hooks:
     - go mod tidy
