@@ -17,7 +17,7 @@
 		return pathname.startsWith(href);
 	}
 
-	let searchQuery = $state('');
+	let searchQuery = $state($page.url.pathname === '/search' ? ($page.url.searchParams.get('q') ?? '') : '');
 
 	function handleSearchKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && searchQuery.trim()) {
@@ -98,9 +98,13 @@
 					<div
 						class="flex items-center gap-2 ml-2 pl-2 border-l border-gray-200 dark:border-gray-700"
 					>
-						<span class="text-sm text-gray-600 dark:text-gray-400 hidden sm:inline">
+						<a
+							href="/profile"
+							class="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 hidden sm:inline no-underline"
+							title="Profile"
+						>
 							{$currentUser.username}
-						</span>
+						</a>
 						<button class="btn-icon" title="Sign out" onclick={handleLogout}>
 							<span class="i-lucide-log-out"></span>
 						</button>

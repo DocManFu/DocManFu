@@ -79,7 +79,19 @@ function createAuthStore() {
 		update((s) => ({ ...s, initialized: true }));
 	}
 
-	return { subscribe, login, logout, updateTokens, loadFromStorage };
+	function updateUser(user: User) {
+		update((s) => {
+			const newState = { ...s, user };
+			try {
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+			} catch {
+				// localStorage unavailable
+			}
+			return newState;
+		});
+	}
+
+	return { subscribe, login, logout, updateTokens, updateUser, loadFromStorage };
 }
 
 export const auth = createAuthStore();

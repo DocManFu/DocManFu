@@ -158,6 +158,67 @@ See [Architecture Documentation](docs/ARCHITECTURE.md) for details.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding conventions, and how to submit changes.
 
+## CLI Tool
+
+`docmanfu` is a companion CLI that watches a directory and automatically uploads new files to your DocManFu instance — useful for scanner workflows (e.g. scanner drops PDFs into `~/Downloads`, CLI picks them up).
+
+### Install
+
+```bash
+# Homebrew (macOS / Linux) — recommended
+brew tap DocManFu/docmanfu
+brew install docmanfu
+
+# Go install (requires Go 1.22+)
+go install github.com/DocManFu/DocManFu/tools/docmanfu-watch@latest
+
+# Build from source
+cd tools/docmanfu-watch
+go install .
+# Binary lands at ~/go/bin/docmanfu
+```
+
+### Usage
+
+```bash
+# First run: prompts for your DocManFu URL and API key, then watches the current directory
+cd ~/Downloads
+docmanfu
+
+# Watch a specific directory
+docmanfu --path ~/scans
+
+# Scan an existing directory and upload files interactively
+docmanfu --scan --path ~/old-scans
+
+# Override saved config
+docmanfu --endpoint http://myserver:8080 --key dmf_abc123
+```
+
+On first run, generate an API key in the web UI under **Profile → API Key**, then paste it when prompted. Config is saved to `~/.config/docmanfu/config.json`.
+
+**Supported file types:** PDF, JPG, PNG, TIFF, WebP
+
+### Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--endpoint` | `-e` | DocManFu URL (saved to config) |
+| `--key` | `-k` | API key (saved to config) |
+| `--path` | `-p` | Directory to watch (default: current directory) |
+| `--scan` | `-s` | Scan for existing files and prompt to upload |
+
+### Releasing a new CLI version
+
+Tag the commit with `cli/vX.Y.Z` to trigger the release workflow:
+
+```bash
+git tag cli/v1.0.0
+git push origin cli/v1.0.0
+```
+
+GoReleaser builds binaries for Linux/macOS/Windows (amd64 + arm64) and updates the Homebrew tap automatically. Requires a `HOMEBREW_TAP_TOKEN` secret in the repository with write access to the [`DocManFu/homebrew-docmanfu`](https://github.com/DocManFu/homebrew-docmanfu) tap repo.
+
 ## Documentation
 
 - [Deployment Guide](docs/DEPLOYMENT.md) — Production setup, reverse proxy, AI config, backups
