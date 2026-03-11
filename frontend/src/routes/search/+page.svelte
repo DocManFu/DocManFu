@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { searchDocuments } from '$lib/api/documents.js';
@@ -79,9 +78,23 @@
 		doSearch();
 	}
 
-	onMount(() => {
-		syncFromUrl();
-		if (query) doSearch();
+	$effect(() => {
+		const urlQuery = $page.url.searchParams.get('q') ?? '';
+		const urlOffset = parseInt($page.url.searchParams.get('offset') ?? '0');
+		const urlType = $page.url.searchParams.get('document_type') ?? '';
+		const urlTag = $page.url.searchParams.get('tag') ?? '';
+		if (
+			urlQuery !== query ||
+			urlOffset !== offset ||
+			urlType !== documentType ||
+			urlTag !== tag
+		) {
+			query = urlQuery;
+			offset = urlOffset;
+			documentType = urlType;
+			tag = urlTag;
+			if (urlQuery) doSearch();
+		}
 	});
 </script>
 

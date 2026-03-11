@@ -53,6 +53,11 @@
 	let editingDueDate = $state(false);
 	let editDueDate = $state('');
 
+	// Notes state
+	let editingNotes = $state(false);
+	let editNotes = $state('');
+	let savingNotes = $state(false);
+
 	// Copy state
 	let copied = $state(false);
 
@@ -142,6 +147,29 @@
 
 	function cancelEditAiName() {
 		editingAiName = false;
+	}
+
+	function startEditNotes() {
+		editNotes = doc?.notes ?? '';
+		editingNotes = true;
+	}
+
+	async function saveNotes() {
+		if (!doc) return;
+		savingNotes = true;
+		try {
+			doc = await updateDocument(doc.id, { notes: editNotes });
+			editingNotes = false;
+			toasts.success('Notes saved');
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to save notes');
+		} finally {
+			savingNotes = false;
+		}
+	}
+
+	function cancelEditNotes() {
+		editingNotes = false;
 	}
 
 	function handleAiNameKeydown(e: KeyboardEvent) {
@@ -589,6 +617,44 @@
 					Tags
 				</h3>
 				<TagInput tags={doc.tags} onchange={handleTagsChange} />
+			</div>
+
+			<!-- Notes -->
+			<div class="card p-4">
+				<div class="flex items-center justify-between mb-3">
+					<h3
+						class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1"
+					>
+						<span class="i-lucide-notebook-pen"></span>
+						Notes
+					</h3>
+					{#if !editingNotes}
+						<button class="btn-ghost btn-sm" onclick={startEditNotes}>
+							<span class="i-lucide-pencil text-xs mr-1"></span>
+							{doc.notes ? 'Edit' : 'Add'}
+						</button>
+					{/if}
+				</div>
+				{#if editingNotes}
+					<textarea
+						class="input-base w-full text-sm resize-y min-h-24"
+						bind:value={editNotes}
+						placeholder="Add notes about this document..."
+						onkeydown={(e) => {
+							if (e.key === 'Escape') cancelEditNotes();
+						}}
+					></textarea>
+					<div class="flex gap-2 mt-2">
+						<button class="btn-primary btn-sm" onclick={saveNotes} disabled={savingNotes}>
+							Save
+						</button>
+						<button class="btn-ghost btn-sm" onclick={cancelEditNotes}>Cancel</button>
+					</div>
+				{:else if doc.notes}
+					<p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{doc.notes}</p>
+				{:else}
+					<p class="text-sm text-gray-400 dark:text-gray-500 italic">No notes yet.</p>
+				{/if}
 			</div>
 
 			<!-- Content text -->

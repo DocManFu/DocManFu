@@ -59,6 +59,7 @@ export interface DocumentListItem {
 export interface DocumentDetail extends DocumentListItem {
 	content_text: string | null;
 	ai_metadata: Record<string, unknown> | null;
+	notes: string | null;
 	file_path: string;
 	created_at: string;
 	updated_at: string;
@@ -119,6 +120,7 @@ export interface DocumentUpdateRequest {
 	ai_generated_name?: string;
 	document_type?: string;
 	ai_metadata?: Record<string, unknown>;
+	notes?: string;
 }
 
 export interface ReprocessResponse {

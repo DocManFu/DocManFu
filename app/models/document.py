@@ -40,6 +40,7 @@ class Document(UUIDMixin, TimestampMixin, Base):
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
     )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     search_vector: Mapped[Optional[str]] = mapped_column(TSVECTOR, nullable=True)
 
     owner: Mapped[Optional["User"]] = relationship(back_populates="documents")

@@ -75,6 +75,7 @@ class DocumentDetail(BaseModel):
     ai_generated_name: str | None
     document_type: str | None
     ai_metadata: dict | None
+    notes: str | None
     file_path: str
     mime_type: str
     file_size: int
@@ -137,6 +138,7 @@ class DocumentUpdateRequest(BaseModel):
     ai_generated_name: str | None = None
     document_type: str | None = None
     ai_metadata: dict | None = None
+    notes: str | None = None
 
 
 class ReprocessResponse(BaseModel):
@@ -644,6 +646,10 @@ def update_document(
 
     if update.ai_metadata is not None:
         doc.ai_metadata = update.ai_metadata
+        search_dirty = True
+
+    if update.notes is not None:
+        doc.notes = update.notes if update.notes.strip() else None
         search_dirty = True
 
     if update.tags is not None:

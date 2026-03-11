@@ -13,7 +13,8 @@ def update_search_vector(db: Session, document_id) -> None:
                 coalesce(original_name, '') || ' ' ||
                 coalesce(ai_generated_name, '') || ' ' ||
                 coalesce(ai_metadata->>'summary', '') || ' ' ||
-                coalesce(ai_metadata->>'company', '')
+                coalesce(ai_metadata->>'company', '') || ' ' ||
+                coalesce(notes, '')
             )
             WHERE id = :doc_id
             """),
