@@ -23,3 +23,4 @@ def update_search_vector(db: Session, document_id) -> None:
         {"doc_id": str(document_id)},
     )
     db.commit()
+
