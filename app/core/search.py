@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 def update_search_vector(db: Session, document_id) -> None:
     """Recompute the tsvector for a single document."""
     db.execute(
-        text(
-            """
+        text("""
             UPDATE documents SET search_vector = to_tsvector('english',
                 coalesce(content_text, '') || ' ' ||
                 coalesce(original_name, '') || ' ' ||
@@ -18,9 +17,7 @@ def update_search_vector(db: Session, document_id) -> None:
                 coalesce(notes, '')
             )
             WHERE id = :doc_id
-            """
-        ),
+            """),
         {"doc_id": str(document_id)},
     )
     db.commit()
-
