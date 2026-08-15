@@ -17,7 +17,9 @@
 		return pathname.startsWith(href);
 	}
 
-	let searchQuery = $state($page.url.pathname === '/search' ? ($page.url.searchParams.get('q') ?? '') : '');
+	let searchQuery = $state(
+		$page.url.pathname === '/search' ? ($page.url.searchParams.get('q') ?? '') : '',
+	);
 
 	function handleSearchKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && searchQuery.trim()) {

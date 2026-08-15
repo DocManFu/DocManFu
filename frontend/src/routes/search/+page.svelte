@@ -5,6 +5,7 @@
 	import type { SearchResultItem, SearchDocumentsParams } from '$lib/types/index.js';
 	import SearchBar from '$lib/components/shared/SearchBar.svelte';
 	import TagBadge from '$lib/components/tags/TagBadge.svelte';
+	import TagAutocomplete from '$lib/components/tags/TagAutocomplete.svelte';
 	import Pagination from '$lib/components/shared/Pagination.svelte';
 	import LoadingSpinner from '$lib/components/shared/LoadingSpinner.svelte';
 	import EmptyState from '$lib/components/shared/EmptyState.svelte';
@@ -21,6 +22,42 @@
 	let limit = $state(24);
 	let documentType = $state('');
 	let tag = $state('');
+	let untagged = $state(false);
+	let untyped = $state(false);
+	let requestId = 0;
+	const docTypes = [
+		'bill',
+		'bank_statement',
+		'medical',
+		'insurance',
+		'tax',
+		'invoice',
+		'receipt',
+		'legal',
+		'correspondence',
+		'report',
+		'other',
+	];
+
+	function escapeHtml(value: string): string {
+		return value.replace(
+			/[&<>"']/g,
+			(char) =>
+				({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char,
+		);
+	}
+
+	function safeHeadline(headline: string | null): string {
+		if (!headline) return '';
+		return headline
+			.split(/(<mark>.*?<\/mark>)/gis)
+			.map((part) =>
+				part.startsWith('<mark>') && part.endsWith('</mark>')
+					? `<mark>${escapeHtml(part.slice(6, -7))}</mark>`
+					: escapeHtml(part),
+			)
+			.join('');
+	}
 
 	function syncFromUrl() {
 		const p = $page.url.searchParams;
@@ -28,6 +65,8 @@
 		offset = parseInt(p.get('offset') ?? '0');
 		documentType = p.get('document_type') ?? '';
 		tag = p.get('tag') ?? '';
+		untagged = p.get('untagged') === 'true';
+		untyped = p.get('untyped') === 'true';
 	}
 
 	function buildUrl(): string {
@@ -36,15 +75,20 @@
 		if (offset > 0) params.set('offset', String(offset));
 		if (documentType) params.set('document_type', documentType);
 		if (tag) params.set('tag', tag);
+		if (untagged) params.set('untagged', 'true');
+		if (untyped) params.set('untyped', 'true');
 		const qs = params.toString();
 		return qs ? `/search?${qs}` : '/search';
 	}
 
 	async function doSearch() {
+		const currentRequest = ++requestId;
 		if (!query.trim()) {
 			documents = [];
 			total = 0;
 			searched = false;
+			loading = false;
+			goto('/search', { replaceState: true, noScroll: true });
 			return;
 		}
 
@@ -56,14 +100,18 @@
 			const params: SearchDocumentsParams = { q: query, offset, limit };
 			if (documentType) params.document_type = documentType;
 			if (tag) params.tag = tag;
+			if (untagged) params.untagged = 'true';
+			if (untyped) params.untyped = 'true';
 
 			const res = await searchDocuments(params);
+			if (currentRequest !== requestId) return;
 			documents = res.documents;
 			total = res.total;
 		} catch (e) {
+			if (currentRequest !== requestId) return;
 			toasts.error(e instanceof Error ? e.message : 'Search failed');
 		} finally {
-			loading = false;
+			if (currentRequest === requestId) loading = false;
 		}
 	}
 
@@ -83,16 +131,22 @@
 		const urlOffset = parseInt($page.url.searchParams.get('offset') ?? '0');
 		const urlType = $page.url.searchParams.get('document_type') ?? '';
 		const urlTag = $page.url.searchParams.get('tag') ?? '';
+		const urlUntagged = $page.url.searchParams.get('untagged') === 'true';
+		const urlUntyped = $page.url.searchParams.get('untyped') === 'true';
 		if (
 			urlQuery !== query ||
 			urlOffset !== offset ||
 			urlType !== documentType ||
-			urlTag !== tag
+			urlTag !== tag ||
+			urlUntagged !== untagged ||
+			urlUntyped !== untyped
 		) {
 			query = urlQuery;
 			offset = urlOffset;
 			documentType = urlType;
 			tag = urlTag;
+			untagged = urlUntagged;
+			untyped = urlUntyped;
 			if (urlQuery) doSearch();
 		}
 	});
@@ -107,6 +161,50 @@
 
 	<div class="mb-6">
 		<SearchBar bind:value={query} onSearch={handleSearch} />
+		<div class="flex flex-wrap items-center gap-3 mt-3">
+			<select
+				class="input-base"
+				bind:value={documentType}
+				onchange={() => {
+					offset = 0;
+					doSearch();
+				}}
+				aria-label="Filter by document type"
+			>
+				<option value="">All types</option>
+				{#each docTypes as type}<option value={type}>{formatDocumentType(type)}</option>{/each}
+			</select>
+			<div class="w-56">
+				<TagAutocomplete
+					selected={tag ? tag.split(',') : []}
+					onchange={(tags) => {
+						tag = tags.join(',');
+						offset = 0;
+						doSearch();
+					}}
+				/>
+			</div>
+			<label class="flex items-center gap-2 text-sm"
+				><input
+					type="checkbox"
+					bind:checked={untagged}
+					onchange={() => {
+						offset = 0;
+						doSearch();
+					}}
+				/> Untagged</label
+			>
+			<label class="flex items-center gap-2 text-sm"
+				><input
+					type="checkbox"
+					bind:checked={untyped}
+					onchange={() => {
+						offset = 0;
+						doSearch();
+					}}
+				/> Untyped</label
+			>
+		</div>
 	</div>
 
 	{#if loading}
@@ -153,7 +251,7 @@
 
 							{#if doc.headline}
 								<p class="text-sm text-gray-600 dark:text-gray-400 mt-2 leading-relaxed">
-									{@html doc.headline}
+									{@html safeHeadline(doc.headline)}
 								</p>
 							{/if}
 
