@@ -160,6 +160,8 @@ export interface SearchDocumentsParams {
 	limit?: number;
 	document_type?: string;
 	tag?: string;
+	untagged?: string;
+	untyped?: string;
 }
 
 // --- Search with highlights ---

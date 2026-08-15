@@ -19,11 +19,14 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter') {
+			e.preventDefault();
+			debouncedSearch.cancel();
 			onSearch(value);
 		}
 	}
 
 	function clear() {
+		debouncedSearch.cancel();
 		value = '';
 		onSearch('');
 	}
