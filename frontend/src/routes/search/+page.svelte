@@ -25,19 +25,38 @@
 	let untagged = $state(false);
 	let untyped = $state(false);
 	let requestId = 0;
-	const docTypes = ['bill', 'bank_statement', 'medical', 'insurance', 'tax', 'invoice', 'receipt', 'legal', 'correspondence', 'report', 'other'];
+	const docTypes = [
+		'bill',
+		'bank_statement',
+		'medical',
+		'insurance',
+		'tax',
+		'invoice',
+		'receipt',
+		'legal',
+		'correspondence',
+		'report',
+		'other',
+	];
 
 	function escapeHtml(value: string): string {
-		return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char);
+		return value.replace(
+			/[&<>"']/g,
+			(char) =>
+				({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] ?? char,
+		);
 	}
 
 	function safeHeadline(headline: string | null): string {
 		if (!headline) return '';
-		return headline.split(/(<mark>.*?<\/mark>)/gis).map((part) =>
-			part.startsWith('<mark>') && part.endsWith('</mark>')
-				? `<mark>${escapeHtml(part.slice(6, -7))}</mark>`
-				: escapeHtml(part),
-		).join('');
+		return headline
+			.split(/(<mark>.*?<\/mark>)/gis)
+			.map((part) =>
+				part.startsWith('<mark>') && part.endsWith('</mark>')
+					? `<mark>${escapeHtml(part.slice(6, -7))}</mark>`
+					: escapeHtml(part),
+			)
+			.join('');
 	}
 
 	function syncFromUrl() {
@@ -117,8 +136,9 @@
 			urlQuery !== query ||
 			urlOffset !== offset ||
 			urlType !== documentType ||
-			urlTag !== tag
-			|| urlUntagged !== untagged || urlUntyped !== untyped
+			urlTag !== tag ||
+			urlUntagged !== untagged ||
+			urlUntyped !== untyped
 		) {
 			query = urlQuery;
 			offset = urlOffset;
@@ -141,13 +161,48 @@
 	<div class="mb-6">
 		<SearchBar bind:value={query} onSearch={handleSearch} />
 		<div class="flex flex-wrap items-center gap-3 mt-3">
-			<select class="input-base" bind:value={documentType} onchange={() => { offset = 0; doSearch(); }} aria-label="Filter by document type">
+			<select
+				class="input-base"
+				bind:value={documentType}
+				onchange={() => {
+					offset = 0;
+					doSearch();
+				}}
+				aria-label="Filter by document type"
+			>
 				<option value="">All types</option>
 				{#each docTypes as type}<option value={type}>{formatDocumentType(type)}</option>{/each}
 			</select>
-			<div class="w-56"><TagAutocomplete selected={tag ? tag.split(',') : []} onchange={(tags) => { tag = tags.join(','); offset = 0; doSearch(); }} /></div>
-			<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={untagged} onchange={() => { offset = 0; doSearch(); }} /> Untagged</label>
-			<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={untyped} onchange={() => { offset = 0; doSearch(); }} /> Untyped</label>
+			<div class="w-56">
+				<TagAutocomplete
+					selected={tag ? tag.split(',') : []}
+					onchange={(tags) => {
+						tag = tags.join(',');
+						offset = 0;
+						doSearch();
+					}}
+				/>
+			</div>
+			<label class="flex items-center gap-2 text-sm"
+				><input
+					type="checkbox"
+					bind:checked={untagged}
+					onchange={() => {
+						offset = 0;
+						doSearch();
+					}}
+				/> Untagged</label
+			>
+			<label class="flex items-center gap-2 text-sm"
+				><input
+					type="checkbox"
+					bind:checked={untyped}
+					onchange={() => {
+						offset = 0;
+						doSearch();
+					}}
+				/> Untyped</label
+			>
 		</div>
 	</div>
 
