@@ -622,9 +622,7 @@
 			<!-- Notes -->
 			<div class="card p-4">
 				<div class="flex items-center justify-between mb-3">
-					<h3
-						class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1"
-					>
+					<h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
 						<span class="i-lucide-notebook-pen"></span>
 						Notes
 					</h3>

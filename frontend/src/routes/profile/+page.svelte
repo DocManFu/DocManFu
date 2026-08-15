@@ -101,12 +101,14 @@
 				<div class="flex gap-4">
 					<dt class="w-24 text-gray-500 dark:text-gray-400 shrink-0">Role</dt>
 					<dd>
-						<span class="inline-block px-2 py-0.5 rounded text-xs font-medium
+						<span
+							class="inline-block px-2 py-0.5 rounded text-xs font-medium
 							{$currentUser.role === 'admin'
 								? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
 								: $currentUser.role === 'readonly'
 									? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-									: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}">
+									: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'}"
+						>
 							{$currentUser.role}
 						</span>
 					</dd>
@@ -120,14 +122,21 @@
 		<div>
 			<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">API Key</h2>
 			<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-				Use this key with the <code class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">docmanfu</code> CLI tool or any API client.
-				Pass it as <code class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">Authorization: Bearer &lt;key&gt;</code>.
+				Use this key with the <code
+					class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">docmanfu</code
+				>
+				CLI tool or any API client. Pass it as
+				<code class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+					>Authorization: Bearer &lt;key&gt;</code
+				>.
 			</p>
 		</div>
 
 		{#if generatedKey}
 			<!-- Show newly generated key -->
-			<div class="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 space-y-3">
+			<div
+				class="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 space-y-3"
+			>
 				<p class="text-sm font-medium text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
 					<span class="i-lucide-triangle-alert text-base"></span>
 					Copy this key now — it won't be shown again.
@@ -172,7 +181,9 @@
 					{revokingKey ? 'Revoking…' : 'Revoke Key'}
 				</button>
 			{:else}
-				<p class="text-sm text-gray-500 dark:text-gray-400 w-full">No API key is currently active.</p>
+				<p class="text-sm text-gray-500 dark:text-gray-400 w-full">
+					No API key is currently active.
+				</p>
 				<button
 					class="btn-primary flex items-center gap-1.5"
 					onclick={handleGenerateKey}
@@ -190,7 +201,10 @@
 		<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Change Password</h2>
 		<div class="space-y-3">
 			<div>
-				<label for="current-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+				<label
+					for="current-password"
+					class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+				>
 					Current password
 				</label>
 				<input
@@ -202,7 +216,10 @@
 				/>
 			</div>
 			<div>
-				<label for="new-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+				<label
+					for="new-password"
+					class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+				>
 					New password
 				</label>
 				<input
@@ -214,7 +231,10 @@
 				/>
 			</div>
 			<div>
-				<label for="confirm-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+				<label
+					for="confirm-password"
+					class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+				>
 					Confirm new password
 				</label>
 				<input
