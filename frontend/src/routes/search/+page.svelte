@@ -88,6 +88,7 @@
 			total = 0;
 			searched = false;
 			loading = false;
+			goto('/search', { replaceState: true, noScroll: true });
 			return;
 		}
 
