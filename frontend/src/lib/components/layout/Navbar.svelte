@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { listBills } from '$lib/api/bills.js';
 	import { theme } from '$lib/stores/theme.js';
 	import { auth, currentUser, isAdmin } from '$lib/stores/auth.js';
 
@@ -20,6 +22,21 @@
 	let searchQuery = $state(
 		$page.url.pathname === '/search' ? ($page.url.searchParams.get('q') ?? '') : '',
 	);
+	let unpaidBillCount = $state(0);
+
+	async function refreshUnpaidBillCount() {
+		try {
+			unpaidBillCount = (await listBills('unpaid', 0, 1)).total;
+		} catch {
+			// The navbar should remain usable if the count request fails.
+		}
+	}
+
+	onMount(() => {
+		refreshUnpaidBillCount();
+		window.addEventListener('docmanfu:bills-updated', refreshUnpaidBillCount);
+		return () => window.removeEventListener('docmanfu:bills-updated', refreshUnpaidBillCount);
+	});
 
 	function handleSearchKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && searchQuery.trim()) {
@@ -57,6 +74,14 @@
 					>
 						<span class={link.icon}></span>
 						<span class="hidden sm:inline">{link.label}</span>
+						{#if link.href === '/bills'}
+							<span
+								class="inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-amber-100 px-1 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+								aria-label={`${unpaidBillCount} unpaid bills`}
+							>
+								{unpaidBillCount}
+							</span>
+						{/if}
 					</a>
 				{/each}
 
