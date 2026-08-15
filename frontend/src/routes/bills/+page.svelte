@@ -78,6 +78,7 @@
 		e.stopPropagation();
 		try {
 			await updateBillStatus(bill.id, 'paid');
+			window.dispatchEvent(new CustomEvent('docmanfu:bills-updated'));
 			toasts.success('Marked as paid');
 			fetchBills();
 		} catch (err) {
@@ -89,6 +90,7 @@
 		e.stopPropagation();
 		try {
 			await updateBillStatus(bill.id, 'dismissed');
+			window.dispatchEvent(new CustomEvent('docmanfu:bills-updated'));
 			toasts.success('Dismissed');
 			fetchBills();
 		} catch (err) {
@@ -100,6 +102,7 @@
 		e.stopPropagation();
 		try {
 			await updateBillStatus(bill.id, 'unpaid');
+			window.dispatchEvent(new CustomEvent('docmanfu:bills-updated'));
 			toasts.success('Marked as unpaid');
 			fetchBills();
 		} catch (err) {

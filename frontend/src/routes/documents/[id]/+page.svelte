@@ -231,6 +231,7 @@
 			const res = await updateBillStatus(doc.id, status);
 			doc.bill_status = res.bill_status;
 			doc.bill_paid_at = res.bill_paid_at;
+			window.dispatchEvent(new CustomEvent('docmanfu:bills-updated'));
 			toasts.success(res.detail);
 		} catch (e) {
 			toasts.error(e instanceof Error ? e.message : 'Failed to update bill status');
