@@ -2,8 +2,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import 'virtual:uno.css';
 	import '../app.css';
+	import 'virtual:uno.css';
 	import Navbar from '$lib/components/layout/Navbar.svelte';
 	import ToastContainer from '$lib/components/shared/ToastContainer.svelte';
 	import JobTracker from '$lib/components/jobs/JobTracker.svelte';

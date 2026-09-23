@@ -1,5 +1,34 @@
 import { defineConfig, presetUno, presetIcons, transformerDirectives } from 'unocss';
 
+const brand = {
+	50: '#eef5ff',
+	100: '#dbeafe',
+	200: '#bcd7fd',
+	300: '#8ec0fb',
+	400: '#58a0f5',
+	500: '#2f86ee',
+	600: '#1a73e8',
+	700: '#1463d6',
+	800: '#1450a8',
+	900: '#163f80',
+	950: '#0f2a57'
+};
+
+// Cool slate grays matching docmanfu.com (paper #f4f7fb → ink #0b1220)
+const gray = {
+	50: '#f4f7fb',
+	100: '#e6ecf4',
+	200: '#d6dee9',
+	300: '#b8c4d4',
+	400: '#8391a6',
+	500: '#5d6b80',
+	600: '#4b5a70',
+	700: '#2a3648',
+	800: '#1e2a3d',
+	900: '#131c2c',
+	950: '#0b1220'
+};
+
 export default defineConfig({
 	presets: [
 		presetUno({ dark: 'class' }),
@@ -14,18 +43,9 @@ export default defineConfig({
 	transformers: [transformerDirectives()],
 	theme: {
 		colors: {
-			brand: {
-				50: '#eff6ff',
-				100: '#dbeafe',
-				200: '#bfdbfe',
-				300: '#93c5fd',
-				400: '#60a5fa',
-				500: '#3b82f6',
-				600: '#2563eb',
-				700: '#1d4ed8',
-				800: '#1e40af',
-				900: '#1e3a8a'
-			}
+			brand,
+			blue: brand,
+			gray
 		}
 	},
 	shortcuts: {

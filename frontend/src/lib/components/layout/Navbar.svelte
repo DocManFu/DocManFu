@@ -59,7 +59,7 @@
 				href="/documents"
 				class="flex items-center gap-2 text-lg font-bold text-brand-600 no-underline"
 			>
-				<img src="/icons/favicon-32x32.png" alt="DocManFu" class="w-5 h-5" />
+				<img src="/logo.png" alt="DocManFu" class="w-8 h-8 rounded-lg" />
 				<span class="hidden sm:inline">DocManFu</span>
 			</a>
 

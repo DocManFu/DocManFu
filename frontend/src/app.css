@@ -1,19 +1,26 @@
 @import '@unocss/reset/tailwind.css';
 
+@font-face {
+	font-family: Manrope;
+	src: url('/fonts/manrope-latin.woff2') format('woff2');
+	font-weight: 400 800;
+	font-display: swap;
+}
+
 :root {
 	--font-sans:
-		-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+		Manrope, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 body {
 	font-family: var(--font-sans);
-	background-color: #f9fafb;
-	color: #111827;
+	background-color: #f4f7fb;
+	color: #0b1220;
 }
 
 :root.dark body {
-	background-color: #111827;
-	color: #f3f4f6;
+	background-color: #0b1220;
+	color: #e6ecf4;
 }
 
 /* Search highlight marks */

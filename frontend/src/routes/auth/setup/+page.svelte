@@ -64,7 +64,7 @@
 		<div class="w-full max-w-sm">
 			<div class="text-center mb-8">
 				<div class="flex items-center justify-center gap-2 text-2xl font-bold text-brand-600 mb-2">
-					<img src="/icons/favicon-96x96.png" alt="DocManFu" class="w-8 h-8" />
+					<img src="/logo.png" alt="DocManFu" class="w-10 h-10 rounded-lg" />
 					DocManFu
 				</div>
 				<p class="text-gray-500 dark:text-gray-400">Create your admin account</p>
