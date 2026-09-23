@@ -1,6 +1,6 @@
 <div align="center">
 
-![DocManFu Logo](assets/images/logo.png)
+![DocManFu — Document Management for the Lazy](assets/images/banner.png)
 
 # DocManFu
 
