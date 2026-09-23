@@ -3,13 +3,9 @@ name: Publish Docker Images
 on:
   release:
     types: [published]
-  push:
-    tags: ["v*"]
 
 env:
   REGISTRY: ghcr.io
-  API_IMAGE: ghcr.io/${{ github.repository }}/api
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
 
 jobs:
   build-and-push:
@@ -34,6 +30,10 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Registry image names must be lowercase
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "API_IMAGE=${{ env.REGISTRY }}/$REPO/api" >> $GITHUB_ENV
+          echo "FRONTEND_IMAGE=${{ env.REGISTRY }}/$REPO/frontend" >> $GITHUB_ENV
 
       - name: Build and push API image
         uses: docker/build-push-action@v6
