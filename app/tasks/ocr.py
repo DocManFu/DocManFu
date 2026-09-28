@@ -96,6 +96,19 @@ def process_ocr(self, job_id: str, document_id: str):
             len(extracted_text),
         )
 
+        # OCR changed content_text/processed_date — refresh the UI now rather
+        # than waiting for AI analysis (which may be slow, skipped, or disabled).
+        from app.core.events import publish_event
+
+        publish_event(
+            "document.updated",
+            {
+                "document_id": document_id,
+                "user_id": str(document.user_id) if document.user_id else None,
+                "changes": ["content_text", "processed_date"],
+            },
+        )
+
         # --- Chain: dispatch AI analysis if provider is configured ---
         if settings.AI_PROVIDER.lower() not in ("none", ""):
             _dispatch_ai_analysis(db, document_id)

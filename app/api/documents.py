@@ -324,6 +324,17 @@ async def upload_document(
     job.celery_task_id = task.id
     db.commit()
 
+    from app.core.events import publish_event
+
+    publish_event(
+        "document.updated",
+        {
+            "document_id": str(doc.id),
+            "user_id": str(user.id),
+            "changes": ["created"],
+        },
+    )
+
     logger.info(
         "Dispatched OCR job %s (celery task %s) for document %s",
         job.id,
