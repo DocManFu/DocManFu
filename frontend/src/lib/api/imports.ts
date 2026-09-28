@@ -1,4 +1,4 @@
-import { apiUploadWithProgress, apiFetch } from './client.js';
+import { apiFetch, ApiError, getAuthHeader } from './client.js';
 
 export interface ImportTaskResponse {
 	task_id: string;
@@ -41,7 +41,46 @@ export async function startEvernoteImport(
 	file: File,
 	onProgress?: (loaded: number, total: number) => void,
 ): Promise<ImportTaskResponse> {
-	return apiUploadWithProgress<ImportTaskResponse>('/api/admin/import/evernote', file, onProgress);
+	return new Promise((resolve, reject) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open('POST', '/api/admin/import/evernote');
+		xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+		xhr.setRequestHeader('X-Filename', encodeURIComponent(file.name));
+
+		const headers = getAuthHeader();
+		for (const [key, value] of Object.entries(headers)) {
+			xhr.setRequestHeader(key, value);
+		}
+
+		xhr.upload.onprogress = (e) => {
+			if (e.lengthComputable && onProgress) {
+				onProgress(e.loaded, e.total);
+			}
+		};
+
+		xhr.onload = () => {
+			if (xhr.status >= 200 && xhr.status < 300) {
+				try {
+					resolve(JSON.parse(xhr.responseText));
+				} catch {
+					reject(new ApiError(xhr.status, 'Invalid JSON response'));
+				}
+				return;
+			}
+
+			let detail = `Import upload failed with status ${xhr.status}`;
+			try {
+				const body = JSON.parse(xhr.responseText);
+				if (body.detail) detail = body.detail;
+			} catch {
+				/* use default */
+			}
+			reject(new ApiError(xhr.status, detail));
+		};
+
+		xhr.onerror = () => reject(new ApiError(0, 'Network error'));
+		xhr.send(file);
+	});
 }
 
 export async function getImportStatus(taskId: string): Promise<ImportStatusResponse> {

@@ -3,9 +3,10 @@
 import logging
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote
 
 from celery.result import AsyncResult
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -37,11 +38,21 @@ class ImportStatusResponse(BaseModel):
 
 @router.post("/evernote", response_model=ImportTaskResponse)
 async def import_evernote(
-    file: UploadFile,
+    request: Request,
+    x_filename: str | None = Header(default=None, alias="X-Filename"),
     admin: User = Depends(require_admin),
 ):
-    """Upload an ENEX file and start background import."""
-    if not file.filename or not file.filename.lower().endswith(".enex"):
+    """Upload an ENEX file and start background import.
+
+    The browser sends the ENEX as the raw request body instead of multipart/form-data.
+    Large Evernote exports can exceed 1 GB; multipart parsing spools the upload before
+    the endpoint runs and has killed production API workers before they can respond.
+    Streaming the raw body keeps memory flat and hands the saved file to Celery.
+    """
+    original_filename = unquote(x_filename or "import.enex").strip() or "import.enex"
+    original_filename = Path(original_filename).name
+
+    if not original_filename.lower().endswith(".enex"):
         raise HTTPException(status_code=400, detail="File must be an .enex file")
 
     # Save to uploads/_imports/ (shared volume between api and worker)
@@ -50,7 +61,9 @@ async def import_evernote(
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".enex", dir=str(import_dir))
     try:
         total_size = 0
-        while chunk := await file.read(1024 * 1024):  # 1MB chunks
+        async for chunk in request.stream():
+            if not chunk:
+                continue
             tmp.write(chunk)
             total_size += len(chunk)
         tmp.close()
@@ -59,22 +72,26 @@ async def import_evernote(
         Path(tmp.name).unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Failed to save upload: {e}")
 
+    if total_size == 0:
+        Path(tmp.name).unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="Uploaded ENEX file was empty")
+
     file_size_mb = total_size / (1024 * 1024)
     logger.info(
         "Admin '%s' started ENEX import: %s (%.1f MB)",
         admin.username,
-        file.filename,
+        original_filename,
         file_size_mb,
     )
 
     # Dispatch Celery task
     from app.tasks.import_evernote import import_evernote_task
 
-    task = import_evernote_task.delay(tmp.name, str(admin.id), file.filename)
+    task = import_evernote_task.delay(tmp.name, str(admin.id), original_filename)
 
     return ImportTaskResponse(
         task_id=task.id,
-        filename=file.filename or "import.enex",
+        filename=original_filename,
         status="started",
     )
 
