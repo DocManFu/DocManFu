@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { searchDocuments } from '$lib/api/documents.js';
@@ -25,6 +26,8 @@
 	let untagged = $state(false);
 	let untyped = $state(false);
 	let requestId = 0;
+	// URL this page last wrote via goto(); navigations to it are our own echoes, not external changes
+	let lastWrittenUrl: string | null = null;
 	const docTypes = [
 		'bill',
 		'bank_statement',
@@ -88,13 +91,15 @@
 			total = 0;
 			searched = false;
 			loading = false;
+			lastWrittenUrl = '/search';
 			goto('/search', { replaceState: true, noScroll: true });
 			return;
 		}
 
 		loading = true;
 		searched = true;
-		goto(buildUrl(), { replaceState: true, noScroll: true });
+		lastWrittenUrl = buildUrl();
+		goto(lastWrittenUrl, { replaceState: true, noScroll: true });
 
 		try {
 			const params: SearchDocumentsParams = { q: query, offset, limit };
@@ -126,29 +131,16 @@
 		doSearch();
 	}
 
+	// Sync state from the URL only on external navigation (back/forward, links). Local
+	// state is read untracked so typing or toggling filters doesn't re-run this and
+	// clobber the input with stale URL values.
 	$effect(() => {
-		const urlQuery = $page.url.searchParams.get('q') ?? '';
-		const urlOffset = parseInt($page.url.searchParams.get('offset') ?? '0');
-		const urlType = $page.url.searchParams.get('document_type') ?? '';
-		const urlTag = $page.url.searchParams.get('tag') ?? '';
-		const urlUntagged = $page.url.searchParams.get('untagged') === 'true';
-		const urlUntyped = $page.url.searchParams.get('untyped') === 'true';
-		if (
-			urlQuery !== query ||
-			urlOffset !== offset ||
-			urlType !== documentType ||
-			urlTag !== tag ||
-			urlUntagged !== untagged ||
-			urlUntyped !== untyped
-		) {
-			query = urlQuery;
-			offset = urlOffset;
-			documentType = urlType;
-			tag = urlTag;
-			untagged = urlUntagged;
-			untyped = urlUntyped;
-			if (urlQuery) doSearch();
-		}
+		const url = $page.url.pathname + $page.url.search;
+		untrack(() => {
+			if (url === lastWrittenUrl) return;
+			syncFromUrl();
+			doSearch();
+		});
 	});
 </script>
 
