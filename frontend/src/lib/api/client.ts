@@ -21,23 +21,40 @@ export function getAuthHeader(): Record<string, string> {
 
 let refreshPromise: Promise<boolean> | null = null;
 
-async function attemptTokenRefresh(): Promise<boolean> {
+/** True if the given user is still logged in (their tokens may have rotated). */
+function isSameSession(userId: string | undefined): boolean {
+	const state = get(auth);
+	return !!state.accessToken && !!userId && state.user?.id === userId;
+}
+
+export async function attemptTokenRefresh(): Promise<boolean> {
 	if (refreshPromise) return refreshPromise;
 
 	refreshPromise = (async () => {
 		try {
-			const state = get(auth);
-			if (!state.refreshToken) return false;
+			const { refreshToken, user } = get(auth);
+			if (!refreshToken) return false;
 
 			const res = await fetch('/api/auth/refresh', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refresh_token: state.refreshToken }),
+				body: JSON.stringify({ refresh_token: refreshToken }),
 			});
 
+			// Credentials changed (logout, login, password change) while the
+			// request was in flight — this result is stale, so don't apply it.
+			// Callers may retry if the same user now holds newer credentials.
+			if (get(auth).refreshToken !== refreshToken) return isSameSession(user?.id);
+
+			if (res.status === 401) {
+				// Refresh token expired or revoked — the session is over
+				auth.logout();
+				return false;
+			}
 			if (!res.ok) return false;
 
 			const data = await res.json();
+			if (get(auth).refreshToken !== refreshToken) return isSameSession(user?.id);
 			auth.updateTokens(data.access_token, data.refresh_token, data.user);
 			return true;
 		} catch {

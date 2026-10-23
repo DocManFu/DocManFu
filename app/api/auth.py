@@ -8,12 +8,11 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, revoke_tokens, user_from_token
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
     create_refresh_token,
-    decode_token,
     generate_api_key,
     hash_password,
     verify_password,
@@ -93,9 +92,11 @@ def _user_response(user: User) -> UserResponse:
     )
 
 
-def _token_response(user: User) -> TokenResponse:
-    access_token = create_access_token(str(user.id), user.role)
-    refresh_token = create_refresh_token(str(user.id))
+def _token_response(user: User, token_version: int | None = None) -> TokenResponse:
+    if token_version is None:
+        token_version = user.token_version
+    access_token = create_access_token(str(user.id), user.role, token_version)
+    refresh_token = create_refresh_token(str(user.id), token_version)
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -175,14 +176,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_token(req: RefreshRequest, db: Session = Depends(get_db)):
     """Exchange a refresh token for new access + refresh tokens."""
-    payload = decode_token(req.refresh_token)
-    if payload is None or payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
-
-    user = db.get(User, payload["sub"])
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="User not found or inactive")
-
+    user = user_from_token(req.refresh_token, "refresh", db)
     return _token_response(user)
 
 
@@ -230,5 +224,11 @@ def change_password(
         )
 
     user.hashed_password = hash_password(req.new_password)
+    token_version = revoke_tokens(db, user)
     db.commit()
-    return {"detail": "Password changed"}
+    # Old tokens are now invalid; hand the caller a fresh pair. Use the version
+    # from our own increment — re-reading could pick up a concurrent reset's.
+    return {
+        "detail": "Password changed",
+        **_token_response(user, token_version).model_dump(mode="json"),
+    }

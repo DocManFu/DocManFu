@@ -1,5 +1,7 @@
 import type { TokenResponse, User, AdminUser } from '$lib/types/index.js';
+import { get } from 'svelte/store';
 import { apiFetch } from './client.js';
+import { auth } from '$lib/stores/auth.js';
 
 export async function checkSetupNeeded(): Promise<boolean> {
 	const res = await fetch('/api/auth/setup-status');
@@ -63,13 +65,18 @@ export async function revokeApiKey(): Promise<void> {
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-	await apiFetch('/api/auth/change-password', {
+	const userId = get(auth).user?.id;
+	const data = await apiFetch<TokenResponse>('/api/auth/change-password', {
 		method: 'POST',
 		body: JSON.stringify({
 			current_password: currentPassword,
 			new_password: newPassword,
 		}),
 	});
+	// Changing the password revokes existing tokens; switch to the new pair,
+	// unless the user logged out or switched accounts while this was in flight
+	if (get(auth).user?.id !== userId) return;
+	auth.updateTokens(data.access_token, data.refresh_token, data.user);
 }
 
 // --- Admin ---

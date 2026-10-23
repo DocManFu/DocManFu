@@ -2,6 +2,10 @@
  * EventSource wrapper for SSE real-time events.
  */
 
+import { get } from 'svelte/store';
+import { auth } from '$lib/stores/auth.js';
+import { attemptTokenRefresh } from './client.js';
+
 export interface JobEvent {
 	job_id: string;
 	document_id: string;
@@ -84,7 +88,19 @@ function clearReconnectTimer() {
 
 function scheduleReconnect() {
 	clearReconnectTimer();
-	reconnectTimer = setTimeout(() => {
+	reconnectTimer = setTimeout(async () => {
+		if (!currentHandlers) return;
+		// EventSource hides the HTTP status, so the drop may have been an
+		// expired or revoked token — refresh before retrying
+		await attemptTokenRefresh();
+		if (!get(auth).accessToken) {
+			// Refresh was rejected and the session ended — stop reconnecting
+			disconnectSSE();
+			if (typeof window !== 'undefined') {
+				window.location.href = '/auth/login';
+			}
+			return;
+		}
 		if (currentHandlers) {
 			connectSSE(currentHandlers);
 		}
@@ -97,16 +113,9 @@ export function connectSSE(handlers: SSEHandlers): void {
 
 	// Pass JWT token as query param (EventSource doesn't support custom headers)
 	let url = '/api/events';
-	try {
-		const raw = localStorage.getItem('docmanfu_auth');
-		if (raw) {
-			const stored = JSON.parse(raw);
-			if (stored.accessToken) {
-				url += `?token=${encodeURIComponent(stored.accessToken)}`;
-			}
-		}
-	} catch {
-		// localStorage unavailable
+	const token = get(auth).accessToken;
+	if (token) {
+		url += `?token=${encodeURIComponent(token)}`;
 	}
 
 	eventSource = new EventSource(url);
