@@ -2,6 +2,7 @@
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
@@ -44,8 +45,16 @@ def get_current_user(
         return user
 
     # JWT auth
+    return user_from_token(token, "access", db)
+
+
+def user_from_token(token: str, token_type: str, db: Session) -> User:
+    """Validate a JWT of the given type and return its active user.
+
+    Rejects tokens issued before the user's last password change.
+    """
     payload = decode_token(token)
-    if payload is None or payload.get("type") != "access":
+    if payload is None or payload.get("type") != token_type:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -53,17 +62,26 @@ def get_current_user(
         )
 
     user = db.get(User, payload["sub"])
-    if not user:
+    if not user or not user.is_active or payload.get("ver") != user.token_version:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is inactive",
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+def revoke_tokens(db: Session, user: User) -> int:
+    """Invalidate all of the user's JWTs and return the new token_version.
+
+    Incremented atomically in SQL so concurrent resets each get a distinct version.
+    """
+    return db.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(token_version=User.token_version + 1)
+        .returning(User.token_version)
+    ).scalar_one()
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:

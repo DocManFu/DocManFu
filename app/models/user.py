@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -16,6 +16,8 @@ class User(UUIDMixin, TimestampMixin, Base):
         String(20), default="user"
     )  # admin, user, readonly
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Bumped to invalidate all outstanding JWTs (password change/reset)
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     api_key: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True, unique=True, index=True
     )

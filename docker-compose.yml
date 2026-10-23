@@ -136,7 +136,7 @@ services:
   # Optional: Ollama for local AI (activate with --profile ollama)
   # Requires NVIDIA Container Toolkit on Linux for GPU support
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.10
     profiles: ["ollama"]
     volumes:
       - ollama_models:/root/.ollama
@@ -162,7 +162,7 @@ services:
 
   # Optional: Ollama without GPU (activate with --profile ollama-cpu)
   ollama-cpu:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.10
     profiles: ["ollama-cpu"]
     volumes:
       - ollama_models:/root/.ollama

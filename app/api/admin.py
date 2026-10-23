@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.auth import require_admin
+from app.core.auth import require_admin, revoke_tokens
 from app.core.security import hash_password
 from app.db.deps import get_db
 from app.models.document import Document
@@ -251,6 +251,7 @@ def reset_user_password(
         )
 
     user.hashed_password = hash_password(req.new_password)
+    revoke_tokens(db, user)
     db.commit()
 
     logger.info(

@@ -15,10 +15,11 @@ COPY . .
 RUN npm run build
 
 # --- Stage 2: Serve with nginx ---
-FROM nginx:alpine
+FROM nginx:1.30-alpine
 
 COPY --from=build /app/build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf
+COPY security-headers.conf trusted-proxies.conf /etc/nginx/
 
 EXPOSE 80
 

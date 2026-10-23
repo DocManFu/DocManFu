@@ -79,6 +79,25 @@ After setting up the reverse proxy, update `CORS_ORIGINS` in `.env`:
 CORS_ORIGINS=["https://docs.example.com"]
 ```
 
+### Login rate limiting behind a proxy
+
+The frontend nginx rate-limits `/api/auth/login` and `/api/auth/setup` per client IP. Behind a reverse proxy every request appears to come from the proxy, so all users share one limit. To rate-limit per real client, tell nginx which address your proxy connects from (only that address — trusting a wider range lets clients spoof `X-Forwarded-For`):
+
+```nginx
+# trusted-proxies.conf
+set_real_ip_from 172.18.0.1;   # e.g. the Docker gateway when the proxy runs on the host
+```
+
+Mount it over the default in `docker-compose.yml`:
+
+```yaml
+  frontend:
+    volumes:
+      - ./trusted-proxies.conf:/etc/nginx/trusted-proxies.conf:ro
+```
+
+Check `docker compose logs frontend` to see which address requests arrive from.
+
 ## AI Provider Configuration
 
 ### Ollama in Docker — with NVIDIA GPU (Linux)

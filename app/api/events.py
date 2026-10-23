@@ -4,19 +4,38 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
+from app.core.auth import user_from_token
 from app.core.config import settings
 from app.core.events import CHANNEL
-from app.core.security import decode_token
+from app.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["events"])
 
 
-async def _event_generator(request: Request, user_id: str | None, is_admin: bool):
+REVALIDATE_SECONDS = 60
+
+
+def _authenticate(token: str) -> tuple[str, bool]:
+    """Return (user_id, is_admin) for a valid access token; raises 401 otherwise."""
+    with SessionLocal() as db:
+        user = user_from_token(token, "access", db)
+        return str(user.id), user.role == "admin"
+
+
+def _token_still_valid(token: str) -> bool:
+    try:
+        _authenticate(token)
+        return True
+    except HTTPException:
+        return False
+
+
+async def _event_generator(request: Request, token: str, user_id: str, is_admin: bool):
     """Async generator that subscribes to Redis pub/sub and yields SSE events.
 
     Filters events so users only receive events for their own documents.
@@ -32,9 +51,18 @@ async def _event_generator(request: Request, user_id: str | None, is_admin: bool
     yield "event: connected\ndata: {}\n\n"
 
     try:
+        loop = asyncio.get_running_loop()
+        next_check = loop.time() + REVALIDATE_SECONDS
         while True:
             if await request.is_disconnected():
                 break
+
+            # End the stream once the token expires or is revoked (password
+            # change, deactivation); the client reconnects with a fresh token
+            if loop.time() >= next_check:
+                if not await asyncio.to_thread(_token_still_valid, token):
+                    break
+                next_check = loop.time() + REVALIDATE_SECONDS
 
             message = await pubsub.get_message(
                 ignore_subscribe_messages=True, timeout=0.0
@@ -48,10 +76,8 @@ async def _event_generator(request: Request, user_id: str | None, is_admin: bool
                     data = parsed.get("data", {})
 
                     # Filter by user ownership (admin gets all)
-                    if not is_admin and user_id:
-                        event_user_id = data.get("user_id")
-                        if event_user_id and event_user_id != user_id:
-                            continue
+                    if not is_admin and data.get("user_id") != user_id:
+                        continue
 
                     event_type = parsed.get("event", "message")
                     yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
@@ -72,17 +98,15 @@ async def sse_events(request: Request, token: str = Query(None)):
     Accepts JWT token as query parameter since EventSource doesn't support
     custom headers.
     """
-    user_id = None
-    is_admin = False
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
-    if token:
-        payload = decode_token(token)
-        if payload and payload.get("type") == "access":
-            user_id = payload.get("sub")
-            is_admin = payload.get("role") == "admin"
+    # Sync DB lookup runs off the event loop; the session is closed before
+    # streaming so no connection is held for the stream's lifetime
+    user_id, is_admin = await asyncio.to_thread(_authenticate, token)
 
     return StreamingResponse(
-        _event_generator(request, user_id, is_admin),
+        _event_generator(request, token, user_id, is_admin),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -5,10 +5,11 @@ import logging
 import mimetypes
 import re
 import uuid
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
+
+from defusedxml.ElementTree import iterparse
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
@@ -162,7 +163,7 @@ def import_evernote_task(
     try:
         # First pass: count total notes for progress
         total_notes = 0
-        for event, elem in ET.iterparse(enex_path, events=("end",)):
+        for event, elem in iterparse(enex_path, events=("end",)):
             if elem.tag == "note":
                 total_notes += 1
             elem.clear()
@@ -182,7 +183,7 @@ def import_evernote_task(
         )
 
         # Second pass: actual import
-        context = ET.iterparse(enex_path, events=("end",))
+        context = iterparse(enex_path, events=("end",))
 
         for event, elem in context:
             if elem.tag != "note":
