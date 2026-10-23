@@ -6,29 +6,68 @@
 - 2 GB RAM minimum (4 GB recommended with Ollama)
 - 10 GB disk space for images + data
 
-## Quick Start
+## Quick Start (prebuilt images)
+
+DocManFu publishes ready-to-run images to the GitHub Container Registry for `linux/amd64` and `linux/arm64` (Intel/AMD servers, Raspberry Pi 4/5, Apple Silicon):
+
+| Image | Used by |
+|-------|---------|
+| `ghcr.io/docmanfu/docmanfu/api` | `api`, `worker` and `migrate` services |
+| `ghcr.io/docmanfu/docmanfu/frontend` | `frontend` (nginx serving the web app and proxying `/api/`) |
+
+You don't need to clone the repository, just two files:
 
 ```bash
-# 1. Clone the repository
-git clone <repo-url> docmanfu && cd docmanfu
+mkdir docmanfu && cd docmanfu
 
-# 2. Create .env from the production template
-cp .env.production.example .env
+# 1. Download the compose file and the settings template
+curl -fsSLO https://raw.githubusercontent.com/DocManFu/DocManFu/main/docker-compose.yml
+curl -fsSL -o .env https://raw.githubusercontent.com/DocManFu/DocManFu/main/.env.production.example
 
-# 3. Generate and set required secrets
-#    Edit .env and fill in:
-#    POSTGRES_PASSWORD (generate: openssl rand -hex 16)
-#    JWT_SECRET_KEY    (generate: openssl rand -hex 32)
+# 2. Set the required secrets in .env
+sed -i.bak "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" .env
+sed -i.bak "s/^JWT_SECRET_KEY=.*/JWT_SECRET_KEY=$(openssl rand -hex 32)/" .env
+rm .env.bak
+
+# 3. Set your domain: CORS_ORIGINS and WEBAUTHN_ORIGIN (see Passkeys below)
 nano .env
 
-# 4. Start all services
-./prod up -d
+# 4. Pull the images and start everything
+docker compose pull
+docker compose up -d
 
 # 5. Verify everything is running
-./prod ps
+docker compose ps
 ```
 
-The app is available at `http://localhost:8080` (or your configured `FRONTEND_PORT`).
+The app is available at `http://localhost:8080` (or your configured `FRONTEND_PORT`). The first account you create becomes the admin.
+
+Uploaded files are stored in `./uploads` next to the compose file (change with `UPLOAD_PATH`); the database lives in the `pgdata` Docker volume.
+
+### Image tags
+
+| Tag | Contents |
+|-----|----------|
+| `latest`, `main` | The newest build of the `main` branch, published within minutes of every merge |
+| `1.2.0`, `1.2` | A release (`1.2` follows the newest `1.2.x`) |
+| `sha-<commit>` | One exact commit, useful to roll back |
+
+The default is `latest`. To stay on releases, set the tag in `.env`:
+
+```bash
+DOCMANFU_VERSION=1.2
+```
+
+### Building from source instead
+
+Clone the repository and use the `./prod` wrapper, which builds the images locally from your checkout:
+
+```bash
+git clone https://github.com/DocManFu/DocManFu.git docmanfu && cd docmanfu
+cp .env.production.example .env   # then set the secrets as above
+./prod up -d
+./prod ps
+```
 
 ## Reverse Proxy Setup
 
@@ -191,6 +230,14 @@ AI_MODEL=claude-sonnet-4-5-20250929
 
 Backups are saved to `backups/` with timestamps (e.g., `docmanfu_db_20250201_020000.sql.gz`).
 
+Running from the prebuilt images without a checkout? Back up with plain Compose commands from the directory holding `docker-compose.yml`:
+
+```bash
+mkdir -p backups
+docker compose exec -T db pg_dump -U docmanfu docmanfu | gzip > backups/docmanfu_db_$(date +%Y%m%d_%H%M%S).sql.gz
+tar czf backups/docmanfu_uploads_$(date +%Y%m%d_%H%M%S).tar.gz uploads   # uploaded files
+```
+
 ### Scheduled Backups (cron)
 
 ```bash
@@ -257,15 +304,24 @@ docker compose logs --tail 100 api
 
 ## Updating
 
-```bash
-# Pull latest code
-git pull
+With the prebuilt images:
 
-# Rebuild images and restart (migrations run automatically)
+```bash
+docker compose pull
+docker compose up -d
+docker image prune -f   # optional: remove the old images
+```
+
+When building from source:
+
+```bash
+git pull
 ./prod rebuild -d
 ```
 
-The `migrate` init service runs `alembic upgrade head` before the API and worker start, so schema changes are applied automatically.
+Either way, the `migrate` init service runs `alembic upgrade head` before the API and worker start, so schema changes are applied automatically. Back up first (see [Backup & Restore](#backup--restore)) if you're jumping several releases.
+
+To roll back, set `DOCMANFU_VERSION` to the previous release or `sha-<commit>` tag and run the two commands above. Migrations aren't reversed automatically, so restore the database backup if the newer version changed the schema.
 
 ## Troubleshooting
 

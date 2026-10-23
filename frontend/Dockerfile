@@ -4,7 +4,9 @@
 # =============================================================================
 
 # --- Stage 1: Build SPA ---
-FROM node:22-alpine AS build
+# The output is static files, so build once on the native platform even when
+# producing images for other architectures
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 WORKDIR /app
 

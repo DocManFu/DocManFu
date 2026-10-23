@@ -31,20 +31,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy Python packages from builder
 COPY --from=builder /install /usr/local
 
-# Create non-root user
+# Create non-root user and the uploads directory it writes to
 RUN groupadd -g 1000 docmanfu && \
-    useradd -u 1000 -g docmanfu -m docmanfu
+    useradd -u 1000 -g docmanfu -m docmanfu && \
+    mkdir -p /app/uploads && chown docmanfu:docmanfu /app/uploads
 
 WORKDIR /app
 
-# Copy application code
-COPY alembic.ini .
-COPY alembic/ alembic/
-COPY app/ app/
-COPY scripts/ scripts/
-
-# Create uploads directory owned by app user
-RUN mkdir -p uploads && chown -R docmanfu:docmanfu /app
+# Copy application code last, with no RUN after it, so a code-only change
+# rebuilds just these layers
+COPY --chown=docmanfu:docmanfu alembic.ini .
+COPY --chown=docmanfu:docmanfu alembic/ alembic/
+COPY --chown=docmanfu:docmanfu scripts/ scripts/
+COPY --chown=docmanfu:docmanfu app/ app/
 
 USER docmanfu
 

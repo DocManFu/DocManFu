@@ -1,7 +1,11 @@
 # =============================================================================
 # DocManFu Production Docker Compose
-# Usage: docker compose up -d  (or ./prod up -d)
+# Usage: docker compose up -d     (pulls prebuilt images from GHCR)
+#        ./prod up -d             (builds the images from this checkout)
+# Pin a release with DOCMANFU_VERSION in .env (default: latest = main branch)
 # =============================================================================
+
+x-api-image: &api-image ghcr.io/docmanfu/docmanfu/api:${DOCMANFU_VERSION:-latest}
 
 services:
   db:
@@ -43,6 +47,7 @@ services:
         max-file: "5"
 
   migrate:
+    image: *api-image
     build: .
     command: ["alembic", "upgrade", "head"]
     env_file: .env
@@ -59,6 +64,7 @@ services:
         max-file: "5"
 
   api:
+    image: *api-image
     build: .
     command: >
       uvicorn app.main:app
@@ -90,6 +96,7 @@ services:
         max-file: "5"
 
   worker:
+    image: *api-image
     build: .
     command: >
       celery -A app.core.celery_app:celery_app worker
@@ -120,6 +127,7 @@ services:
         max-file: "5"
 
   frontend:
+    image: ghcr.io/docmanfu/docmanfu/frontend:${DOCMANFU_VERSION:-latest}
     build: ./frontend
     ports:
       - "${FRONTEND_PORT:-8080}:80"

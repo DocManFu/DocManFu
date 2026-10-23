@@ -1,16 +1,43 @@
 name: Publish Docker Images
 
+# Builds ghcr.io/docmanfu/docmanfu/{api,frontend} for linux/amd64 + linux/arm64.
+#
+# Runs on self-hosted runners (see docs/BUILD_RUNNERS.md) so the BuildKit cache
+# stays warm between builds: the Mac mini (label docmanfu-mac) normally, Beast
+# (label docmanfu-beast) as the backup. The failover job hands the build to
+# Beast when the Mac mini doesn't pick it up within two minutes or the build
+# fails there.
+#
+# Never add pull_request triggers here: the repo is public, and these runners
+# are machines on a home network.
+
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Build machine
+        type: choice
+        options: [mac, beast]
+        default: mac
+
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  # A newer push to main supersedes an older build; releases always finish
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 env:
-  REGISTRY: ghcr.io
+  REGISTRY: ghcr.io/docmanfu/docmanfu
 
 jobs:
-  build-and-push:
-    name: Build & Push
-    runs-on: ubuntu-latest
+  build:
+    name: Build & push
+    runs-on: ${{ inputs.runner == 'beast' && 'docmanfu-beast' || 'docmanfu-mac' }}
+    # Beast emulates arm64 with QEMU, so its cold builds are slow
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
@@ -21,34 +48,80 @@ jobs:
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version tag
-        id: meta
+      - name: API image tags
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/api
+          bake-target: docker-metadata-action-api
+          tags: &tags |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Frontend image tags
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/frontend
+          bake-target: docker-metadata-action-frontend
+          tags: *tags
+
+      # Uses the persistent "docmanfu" builder created on each runner, so
+      # unchanged layers come from its local cache instead of the registry
+      - name: Build and push
+        uses: docker/bake-action@v6
+        with:
+          source: .
+          builder: docmanfu
+          files: |
+            ./docker-bake.hcl
+            cwd://${{ steps.meta-api.outputs.bake-file }}
+            cwd://${{ steps.meta-frontend.outputs.bake-file }}
+          push: true
+          # The registry cache lets the backup runner reuse the other one's layers
+          set: |
+            api.cache-to=type=registry,ref=${{ env.REGISTRY }}/api:buildcache,mode=max
+            frontend.cache-to=type=registry,ref=${{ env.REGISTRY }}/frontend:buildcache,mode=max
+
+  failover:
+    name: Fail over to Beast
+    if: inputs.runner != 'beast'
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    permissions:
+      actions: write
+    steps:
+      - name: Wait for the Mac mini build
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          # Registry image names must be lowercase
-          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "API_IMAGE=${{ env.REGISTRY }}/$REPO/api" >> $GITHUB_ENV
-          echo "FRONTEND_IMAGE=${{ env.REGISTRY }}/$REPO/frontend" >> $GITHUB_ENV
+          jobs="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs"
+          deadline=$((SECONDS + 120))
+          while true; do
+            state=$(gh api "$jobs" --jq '.jobs[] | select(.name == "Build & push") | "\(.status) \(.conclusion)"')
+            echo "Build job: $state"
+            case "$state" in
+              "completed success" | "completed cancelled" | "completed skipped") exit 0 ;;
+              completed*) reason="the build failed on the Mac mini"; break ;;
+              queued* | waiting* | pending*)
+                if (( SECONDS > deadline )); then
+                  reason="the Mac mini didn't pick up the build"
+                  break
+                fi
+                ;;
+            esac
+            sleep 10
+          done
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.version }}
-            ${{ env.API_IMAGE }}:latest
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: frontend
-          push: true
-          tags: |
-            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.version }}
-            ${{ env.FRONTEND_IMAGE }}:latest
+          echo "::warning::Building on Beast instead: $reason"
+          gh workflow run docker-publish.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f runner=beast
+          # Drop the queued Mac mini job. On main the new run's concurrency
+          # group may cancel this run first, which is fine.
+          gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" || true
