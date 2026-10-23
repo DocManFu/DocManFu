@@ -10,16 +10,23 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import func, text
+from sqlalchemy import and_, case, func, literal_column, not_, or_, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.auth import get_current_user, require_write_access
 from app.core.config import settings
 from app.core.search import update_search_vector
+from app.core.search_query import (
+    Term,
+    normalize_type,
+    parse_period,
+    parse_query,
+    parse_relative,
+)
 from app.db.deps import get_db
 from app.models.document import Document
 from app.models.processing_job import JobType, ProcessingJob
-from app.models.tag import Tag
+from app.models.tag import Tag, document_tags
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -111,8 +118,28 @@ class SearchResultItem(BaseModel):
     tags: list[TagResponse]
     headline: str | None = None
     rank: float = 0.0
+    document_date: str | None = None  # AI-extracted date, else upload date
 
     model_config = {"from_attributes": True}
+
+
+class SearchTerm(BaseModel):
+    key: str
+    value: str
+    negated: bool
+    start: int
+    end: int
+
+
+class FacetValue(BaseModel):
+    value: str
+    count: int
+
+
+class SearchFacets(BaseModel):
+    types: list[FacetValue]
+    tags: list[FacetValue]
+    years: list[FacetValue]
 
 
 class SearchPaginatedResponse(BaseModel):
@@ -120,6 +147,9 @@ class SearchPaginatedResponse(BaseModel):
     total: int
     offset: int
     limit: int
+    terms: list[SearchTerm] = []
+    errors: list[str] = []
+    facets: SearchFacets | None = None
 
 
 class UploadResponse(BaseModel):
@@ -179,9 +209,134 @@ def _get_document_or_404(db: Session, document_id: UUID, user: User) -> Document
 # NOTE: /search and /upload MUST be defined before /{document_id} routes
 
 
+# Document date for date filters: the AI-extracted YYYY-MM-DD when well-formed,
+# else the upload date. Compared as ISO strings so a malformed value can't
+# raise a cast error.
+_ISO_DATE = r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
+_doc_date = case(
+    (
+        Document.ai_metadata["date"].astext.op("~")(_ISO_DATE),
+        Document.ai_metadata["date"].astext,
+    ),
+    else_=func.to_char(Document.upload_date, "YYYY-MM-DD"),
+)
+
+
+def _utf16_len(value: str) -> int:
+    """Length in UTF-16 code units — the offsets JavaScript string slicing uses."""
+    return len(value.encode("utf-16-le")) // 2
+
+
+def _like(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _ilike(column, value: str):
+    return func.coalesce(column, "").ilike(_like(value), escape="\\")
+
+
+def _term_condition(term: Term):
+    key, value = term.key, term.value
+    lowered = value.lower()
+    if key == "title":
+        return or_(
+            _ilike(Document.original_name, value),
+            _ilike(Document.ai_generated_name, value),
+        )
+    if key == "ocr":
+        return _ilike(Document.content_text, value)
+    if key == "tag":
+        return Document.tags.any(func.lower(Tag.name) == lowered)
+    if key == "type":
+        return Document.document_type == normalize_type(value)
+    if key == "company":
+        return _ilike(Document.ai_metadata["company"].astext, value)
+    if key == "notes":
+        return _ilike(Document.notes, value)
+    if key == "is":
+        if lowered == "untagged":
+            return ~Document.tags.any()
+        if lowered == "untyped":
+            return Document.document_type.is_(None)
+        if lowered == "bill":
+            return Document.bill_status.isnot(None)
+        if lowered == "overdue":
+            return and_(
+                Document.bill_status == "unpaid",
+                Document.bill_due_date < date.today(),
+            )
+        return Document.bill_status == lowered  # paid / unpaid / dismissed
+    if key == "has":
+        if lowered == "tags":
+            return Document.tags.any()
+        if lowered == "type":
+            return Document.document_type.isnot(None)
+        if lowered == "due":
+            return Document.bill_due_date.isnot(None)
+        column = Document.notes if lowered == "notes" else Document.content_text
+        return func.coalesce(func.trim(column), "") != ""
+    if key in ("after", "before", "date"):
+        period = parse_period(value)
+        if key == "after":
+            return _doc_date >= period.start
+        if key == "before":
+            return _doc_date < period.start
+        return and_(_doc_date >= period.start, _doc_date < period.end)
+    cutoff = parse_relative(value).isoformat()  # newer_than / older_than
+    return _doc_date >= cutoff if key == "newer_than" else _doc_date < cutoff
+
+
+def _facets(db: Session, ids) -> SearchFacets:
+    """Counts by type, tag and year over the full (unpaginated) result set."""
+    types = (
+        db.query(Document.document_type, func.count())
+        .filter(Document.id.in_(ids), Document.document_type.isnot(None))
+        .group_by(Document.document_type)
+        .order_by(func.count().desc())
+        .all()
+    )
+    tags = (
+        db.query(Tag.name, func.count(func.distinct(document_tags.c.document_id)))
+        .join(document_tags, document_tags.c.tag_id == Tag.id)
+        .filter(document_tags.c.document_id.in_(ids))
+        .group_by(Tag.name)
+        .order_by(
+            func.count(func.distinct(document_tags.c.document_id)).desc(), Tag.name
+        )
+        .limit(15)
+        .all()
+    )
+    year = func.substr(_doc_date, 1, 4)
+    years = (
+        db.query(year, func.count())
+        .filter(Document.id.in_(ids))
+        .group_by(year)
+        .order_by(year.desc())
+        .all()
+    )
+    return SearchFacets(
+        types=[FacetValue(value=v, count=c) for v, c in types],
+        tags=[FacetValue(value=v, count=c) for v, c in tags],
+        years=[FacetValue(value=v, count=c) for v, c in years],
+    )
+
+
 @router.get("/search", response_model=SearchPaginatedResponse)
 def search_documents(
-    q: str = Query(..., min_length=1, description="Search query"),
+    q: str = Query(
+        ...,
+        min_length=1,
+        description=(
+            "Search query. Free text plus Gmail-style operators: title:, ocr:, "
+            "tag:, type:, company:, notes:, is:, has:, after:, before:, date:, "
+            "newer_than:, older_than:. Prefix with - to exclude; quote values "
+            'with spaces (title:"city newsletter").'
+        ),
+    ),
+    sort: str = Query(
+        "relevance", pattern="^(relevance|newest|oldest|name)$", description="Sort"
+    ),
     document_type: str | None = Query(None),
     tag: str | None = Query(
         None, description="Filter by tag name (comma-separated for multiple)"
@@ -195,33 +350,30 @@ def search_documents(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Full-text search using PostgreSQL tsvector with ranking and highlights."""
-    ts_query = func.plainto_tsquery("english", q)
+    """Full-text + operator search with ranking, highlights and facet counts."""
+    parsed = parse_query(q)
 
-    # Base filter: not deleted, matches search query
-    query = (
-        db.query(
-            Document,
-            func.ts_rank(Document.search_vector, ts_query).label("rank"),
-            func.ts_headline(
-                "english",
-                func.coalesce(Document.content_text, ""),
-                ts_query,
-                "MaxWords=35, MinWords=15, StartSel=<mark>, StopSel=</mark>",
-            ).label("headline"),
-        )
-        .filter(Document.deleted_at.is_(None))
-        .filter(Document.search_vector.op("@@")(ts_query))
-    )
-
+    query = db.query(Document).filter(Document.deleted_at.is_(None))
     if user.role != "admin":
         query = query.filter(Document.user_id == user.id)
 
+    ts_query = None
+    if parsed.text:
+        ts_query = func.websearch_to_tsquery("english", parsed.text)
+        query = query.filter(Document.search_vector.op("@@")(ts_query))
+
+    for term in parsed.terms:
+        condition = _term_condition(term)
+        if term.negated:
+            # NOT on a NULL comparison is NULL, which would drop the row
+            condition = not_(func.coalesce(condition, False))
+        query = query.filter(condition)
+
+    # Legacy query params (old links); the UI now folds these into q
     if document_type:
         query = query.filter(Document.document_type == document_type)
     if tag:
-        tag_names = [t.strip() for t in tag.split(",") if t.strip()]
-        for tag_name in tag_names:
+        for tag_name in [t.strip() for t in tag.split(",") if t.strip()]:
             query = query.filter(Document.tags.any(Tag.name == tag_name))
     if untagged:
         query = query.filter(~Document.tags.any())
@@ -229,23 +381,81 @@ def search_documents(
         query = query.filter(Document.document_type.is_(None))
 
     total = query.count()
+    facets = _facets(db, query.with_entities(Document.id).scalar_subquery())
+
+    # Highlight free-text and ocr: matches in the OCR text
+    ocr_words = " ".join(
+        t.value for t in parsed.terms if t.key == "ocr" and not t.negated
+    )
+    highlight = ts_query
+    if ocr_words:
+        ocr_query = func.plainto_tsquery("english", ocr_words)
+        highlight = ocr_query if highlight is None else highlight.op("||")(ocr_query)
+    headline = (
+        func.ts_headline(
+            "english",
+            func.coalesce(Document.content_text, ""),
+            highlight,
+            "MaxWords=35, MinWords=15, StartSel=<mark>, StopSel=</mark>",
+        )
+        if highlight is not None
+        else Document.ai_metadata["summary"].astext
+    )
+    rank = (
+        func.ts_rank(Document.search_vector, ts_query)
+        if ts_query is not None
+        else literal_column("0")
+    )
+
+    if sort == "relevance" and ts_query is not None:
+        order = [text("rank DESC"), _doc_date.desc()]
+    elif sort == "oldest":
+        order = [_doc_date.asc()]
+    elif sort == "name":
+        order = [
+            func.lower(
+                func.coalesce(Document.ai_generated_name, Document.original_name)
+            )
+        ]
+    else:
+        order = [_doc_date.desc()]
+
     rows = (
-        query.options(selectinload(Document.tags))
-        .order_by(text("rank DESC"))
+        query.add_columns(
+            rank.label("rank"), headline.label("headline"), _doc_date.label("doc_date")
+        )
+        .options(selectinload(Document.tags))
+        .order_by(*order, Document.id)
         .offset(offset)
         .limit(limit)
         .all()
     )
 
     results = []
-    for doc, rank, headline in rows:
+    for doc, rank_value, headline_value, doc_date in rows:
         item = SearchResultItem.model_validate(doc)
-        item.rank = float(rank)
-        item.headline = headline
+        item.rank = float(rank_value or 0)
+        item.headline = headline_value
+        item.document_date = doc_date
         results.append(item)
 
     return SearchPaginatedResponse(
-        documents=results, total=total, offset=offset, limit=limit
+        documents=results,
+        total=total,
+        offset=offset,
+        limit=limit,
+        terms=[
+            SearchTerm(
+                key=t.key,
+                value=t.value,
+                negated=t.negated,
+                start=_utf16_len(q[: t.start]),
+                end=_utf16_len(q[: t.end]),
+            )
+            for t in parsed.terms
+        ],
+        errors=parsed.errors,
+        facets=facets,
     )
 
 

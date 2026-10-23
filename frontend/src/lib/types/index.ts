@@ -161,14 +161,13 @@ export interface ListDocumentsParams {
 	sort_order?: 'asc' | 'desc';
 }
 
+export type SearchSort = 'relevance' | 'newest' | 'oldest' | 'name';
+
 export interface SearchDocumentsParams {
 	q: string;
+	sort?: SearchSort;
 	offset?: number;
 	limit?: number;
-	document_type?: string;
-	tag?: string;
-	untagged?: string;
-	untyped?: string;
 }
 
 // --- Search with highlights ---
@@ -176,6 +175,28 @@ export interface SearchDocumentsParams {
 export interface SearchResultItem extends DocumentListItem {
 	headline: string | null;
 	rank: number;
+	/** AI-extracted document date (YYYY-MM-DD), else the upload date */
+	document_date: string | null;
+}
+
+/** A parsed operator from the query, with its character span in `q`. */
+export interface SearchTerm {
+	key: string;
+	value: string;
+	negated: boolean;
+	start: number;
+	end: number;
+}
+
+export interface FacetValue {
+	value: string;
+	count: number;
+}
+
+export interface SearchFacets {
+	types: FacetValue[];
+	tags: FacetValue[];
+	years: FacetValue[];
 }
 
 export interface SearchPaginatedResponse {
@@ -183,6 +204,9 @@ export interface SearchPaginatedResponse {
 	total: number;
 	offset: number;
 	limit: number;
+	terms: SearchTerm[];
+	errors: string[];
+	facets: SearchFacets | null;
 }
 
 // --- Tag management ---
