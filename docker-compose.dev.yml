@@ -43,6 +43,7 @@ services:
       DATABASE_URL: postgresql://docmanfu:docmanfu@db:5432/docmanfu
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: '["http://localhost:5180"]'
+      WEBAUTHN_ORIGIN: http://localhost:5180
       LOG_LEVEL: INFO
       UPLOAD_DIR: uploads
       AI_PROVIDER: ollama

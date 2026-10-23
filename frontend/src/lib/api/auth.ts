@@ -3,11 +3,18 @@ import { get } from 'svelte/store';
 import { apiFetch } from './client.js';
 import { auth } from '$lib/stores/auth.js';
 
-export async function checkSetupNeeded(): Promise<boolean> {
+export async function getSetupStatus(): Promise<{
+	setup_needed: boolean;
+	passkeys_enabled: boolean;
+}> {
 	const res = await fetch('/api/auth/setup-status');
 	if (!res.ok) throw new Error('Failed to check setup status');
 	const data = await res.json();
-	return data.setup_needed === true;
+	return { setup_needed: data.setup_needed === true, passkeys_enabled: !!data.passkeys_enabled };
+}
+
+export async function checkSetupNeeded(): Promise<boolean> {
+	return (await getSetupStatus()).setup_needed;
 }
 
 export async function setup(

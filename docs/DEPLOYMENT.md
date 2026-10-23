@@ -79,6 +79,16 @@ After setting up the reverse proxy, update `CORS_ORIGINS` in `.env`:
 CORS_ORIGINS=["https://docs.example.com"]
 ```
 
+### Passkeys
+
+To let users sign in with passkeys (e.g. stored in Bitwarden, 1Password, or the OS), set `WEBAUTHN_ORIGIN` in `.env` to the exact URL users open DocManFu at:
+
+```
+WEBAUTHN_ORIGIN=https://docs.example.com
+```
+
+Passkeys only work over HTTPS (or `http://localhost`) and are bound to that hostname — changing the domain later invalidates registered passkeys. Users add passkeys from their Profile page.
+
 ### Login rate limiting behind a proxy
 
 The frontend nginx rate-limits `/api/auth/login` and `/api/auth/setup` per client IP. Behind a reverse proxy every request appears to come from the proxy, so all users share one limit. To rate-limit per real client, tell nginx which address your proxy connects from (only that address — trusting a wider range lets clients spoof `X-Forwarded-For`):

@@ -96,6 +96,7 @@ SECURITY.md             # Security policy and vulnerability reporting
 - `AI_BASE_URL` overrides the API base URL for OpenAI-compatible endpoints (used by Ollama provider, e.g. `http://ollama:11434`)
 - `AI_MAX_TEXT_LENGTH` caps document text sent to the AI to control costs (default: `4000` chars)
 - `AI_TIMEOUT` is the max seconds to wait for an AI API response (default: `60`)
+- `WEBAUTHN_ORIGIN` is the exact URL users open DocManFu at (e.g. `https://docs.example.com`); enables passkey login. The WebAuthn RP ID is its hostname. Empty (default) disables passkeys
 
 ### FastAPI & API
 - App entry point is `app/main.py` — run with `uvicorn app.main:app --reload`
@@ -115,6 +116,7 @@ SECURITY.md             # Security policy and vulnerability reporting
 - **GET /api/jobs** — list all processing jobs with pagination (offset/limit, max 100), filtering (status, job_type), and sorting (created_at asc|desc). Returns `JobListResponse` with `jobs`, `total`, `offset`, `limit`. Each job includes `document_name`. Admin sees all jobs; non-admin sees only their own.
 - **GET /api/jobs/{job_id}/status** — returns job status, progress (0-100), error_message, and result_data
 - **POST /api/jobs/{job_id}/cancel** — cancel a pending or processing job. Revokes the Celery task and marks the job as failed with "Cancelled by user". Returns 400 if job is already completed/failed.
+- **Passkeys** (`app/api/passkeys.py`, prefix `/api/auth/passkeys`) — WebAuthn via `py_webauthn`. `POST /register/options` (requires current password) + `/register/verify` (signed in); `GET ""` and `DELETE /{id}` manage the current user's passkeys; `POST /login/options` + `/login/verify` (public) sign in with a discoverable credential (no username) and return `TokenResponse`. Resident key and user verification are required. Challenges are single-use, stored in Redis for 5 minutes. `GET /api/auth/setup-status` reports `passkeys_enabled`
 - Route ordering in `documents.py`: `/search` and `/upload` are defined **before** `/{document_id}` to prevent FastAPI from parsing path literals as UUIDs
 - List/search queries use `selectinload(Document.tags)` to eagerly load tags without affecting pagination counts
 - Pydantic response models use `model_config = {"from_attributes": True}` for ORM-to-schema conversion

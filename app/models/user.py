@@ -24,10 +24,14 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     documents: Mapped[list["Document"]] = relationship(back_populates="owner")
     tags: Mapped[list["Tag"]] = relationship(back_populates="owner")
+    passkeys: Mapped[list["Passkey"]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User {self.username}>"
 
 
 from app.models.document import Document  # noqa: E402
+from app.models.passkey import Passkey  # noqa: E402
 from app.models.tag import Tag  # noqa: E402

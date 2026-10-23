@@ -44,5 +44,9 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Passkeys (WebAuthn) — the URL users open DocManFu at, e.g.
+    # "https://docs.example.com". Empty disables passkey login.
+    WEBAUTHN_ORIGIN: str = ""
+
 
 settings = Settings()

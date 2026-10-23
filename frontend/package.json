@@ -31,6 +31,7 @@
 		"vite": "^7.3.1"
 	},
 	"dependencies": {
+		"@simplewebauthn/browser": "^14.0.0",
 		"pdfjs-dist": "^5.4.624"
 	}
 }

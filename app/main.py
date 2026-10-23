@@ -16,6 +16,7 @@ from app.api.events import router as events_router
 from app.api.health import router as health_router
 from app.api.imports import router as imports_router
 from app.api.jobs import router as jobs_router
+from app.api.passkeys import router as passkeys_router
 from app.api.settings import router as settings_router
 from app.api.tags import router as tags_router
 from app.core.config import settings
@@ -57,6 +58,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(passkeys_router)
 app.include_router(admin_router)
 app.include_router(imports_router)
 app.include_router(events_router)
