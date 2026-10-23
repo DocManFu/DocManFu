@@ -16,6 +16,8 @@ GitHub-hosted runners start every build with an empty cache, and building arm64 
 | Code-only change (warm cache) | ~10 s |
 | Cold, no cache | ~75 s |
 
+Beast (backup) takes ~50 s warm, but ~80 minutes fully cold because arm64 runs under QEMU on an old Xeon. In practice it pulls most layers from the Mac mini's registry cache instead.
+
 The Dockerfiles are arranged for this: application code is copied last with no `RUN` after it, and the frontend's Node build runs once on the native platform (`--platform=$BUILDPLATFORM`), since its output is static files.
 
 ## The machines
