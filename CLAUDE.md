@@ -45,7 +45,8 @@ frontend/
   nginx.conf            # SPA routing + /api proxy + SSE support
   .prettierrc           # Prettier config for Svelte/TS formatting
 Dockerfile              # Production backend image (multi-stage, non-root)
-docker-compose.yml      # Production compose (db, redis, migrate, api, worker, frontend)
+docker-compose.yml      # Production compose (db, redis, migrate, api, worker, frontend); images from GHCR, or built locally
+docker-bake.hcl         # Multi-arch (amd64+arm64) build of the api + frontend images, used by docker-publish.yml
 docker-compose.dev.yml  # Development compose
 dev                     # Development CLI wrapper
 prod                    # Production CLI wrapper
@@ -62,7 +63,7 @@ SECURITY.md             # Security policy and vulnerability reporting
   PULL_REQUEST_TEMPLATE.md
   workflows/
     ci.yml              # CI: lint, test, build checks
-    docker-publish.yml  # Publish Docker images to GHCR on release
+    docker-publish.yml  # Build + push images to GHCR on merge to main and on release (self-hosted runners, see docs/BUILD_RUNNERS.md)
 ```
 
 ## Key Conventions
@@ -251,7 +252,9 @@ Production files:
 - `.env.production.example` — Production env template
 - `scripts/backup.sh` — Database backup with retention cleanup
 - `scripts/restore.sh` — Interactive database restore
-- `docs/DEPLOYMENT.md` — Full deployment guide (reverse proxy, AI config, scaling, troubleshooting)
+- `docs/DEPLOYMENT.md` — Full deployment guide (prebuilt images, reverse proxy, AI config, scaling, troubleshooting)
+- `docs/BUILD_RUNNERS.md` — How the GHCR images are built: Mac mini primary runner, Beast backup, failover, runner setup
+- Images: `ghcr.io/docmanfu/docmanfu/api` (api/worker/migrate) and `ghcr.io/docmanfu/docmanfu/frontend`; tags `latest`/`main` (every merge), `X.Y.Z`/`X.Y` (releases), `sha-<commit>`. `DOCMANFU_VERSION` in `.env` picks the tag. In the backend Dockerfile, keep app code copied last with no `RUN` after it so code-only builds stay fast
 
 ## Rules
 - Don't commit to git unless explicitly told to

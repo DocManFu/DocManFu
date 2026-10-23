@@ -57,20 +57,19 @@ Services: frontend (`:5180`), API (`:8100`), PostgreSQL (`:5450`), Redis (`:6390
 
 ### Production
 
+Prebuilt images for amd64 and arm64 are published to GHCR on every merge to `main`, so self-hosting needs just two files:
+
 ```bash
-# Create .env from template
-cp .env.production.example .env
+mkdir docmanfu && cd docmanfu
+curl -fsSLO https://raw.githubusercontent.com/DocManFu/DocManFu/main/docker-compose.yml
+curl -fsSL -o .env https://raw.githubusercontent.com/DocManFu/DocManFu/main/.env.production.example
 # Edit .env — set POSTGRES_PASSWORD and JWT_SECRET_KEY at minimum
 nano .env
 
-# Start all services
-./prod up -d
-
-# Verify
-./prod ps
+docker compose pull && docker compose up -d
 ```
 
-Open [http://localhost:8080](http://localhost:8080). See [Deployment Guide](docs/DEPLOYMENT.md) for reverse proxy, AI configuration, backups, and scaling.
+Open [http://localhost:8080](http://localhost:8080). See the [Deployment Guide](docs/DEPLOYMENT.md) for image tags, updating, building from source, reverse proxy, AI configuration, backups, and scaling.
 
 ### AI Setup (optional)
 
@@ -222,6 +221,7 @@ GoReleaser builds binaries for Linux/macOS/Windows (amd64 + arm64) and updates t
 ## Documentation
 
 - [Deployment Guide](docs/DEPLOYMENT.md) — Production setup, reverse proxy, AI config, backups
+- [Build Runners](docs/BUILD_RUNNERS.md) — How the GHCR images are built (maintainers)
 - [Architecture](docs/ARCHITECTURE.md) — System design, services, data flow
 - [Contributing](CONTRIBUTING.md) — Development setup, conventions, PR process
 - [Security Policy](SECURITY.md) — Vulnerability reporting
