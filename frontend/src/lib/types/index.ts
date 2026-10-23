@@ -10,6 +10,13 @@ export interface User {
 	created_at: string;
 }
 
+export interface Passkey {
+	id: string;
+	name: string;
+	created_at: string;
+	last_used_at: string | null;
+}
+
 export interface TokenResponse {
 	access_token: string;
 	refresh_token: string;

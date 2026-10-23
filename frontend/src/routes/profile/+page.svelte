@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { auth, currentUser } from '$lib/stores/auth.js';
-	import { generateApiKey, revokeApiKey, changePassword } from '$lib/api/auth.js';
+	import { onMount } from 'svelte';
+	import { generateApiKey, revokeApiKey, changePassword, getSetupStatus } from '$lib/api/auth.js';
+	import {
+		deletePasskey,
+		isPasskeyCancelled,
+		listPasskeys,
+		registerPasskey,
+	} from '$lib/api/passkeys.js';
+	import ConfirmDialog from '$lib/components/shared/ConfirmDialog.svelte';
 	import { toasts } from '$lib/stores/toast.js';
+	import type { Passkey } from '$lib/types/index.js';
 
 	// API key state
 	let generatedKey = $state<string | null>(null);
@@ -14,6 +23,63 @@
 	let newPassword = $state('');
 	let confirmPassword = $state('');
 	let changingPassword = $state(false);
+
+	// Passkey state
+	let passkeysEnabled = $state(false);
+	let passkeys = $state<Passkey[]>([]);
+	let addingPasskey = $state(false);
+	let passkeyName = $state('');
+	let passkeyPassword = $state('');
+	let registeringPasskey = $state(false);
+	let removingPasskeyId = $state<string | null>(null);
+	let removeTarget = $state<Passkey | null>(null);
+
+	onMount(async () => {
+		try {
+			passkeysEnabled = (await getSetupStatus()).passkeys_enabled && !!window.PublicKeyCredential;
+			if (passkeysEnabled) passkeys = await listPasskeys();
+		} catch {
+			// Leave the passkey section hidden
+		}
+	});
+
+	async function handleAddPasskey() {
+		registeringPasskey = true;
+		try {
+			const passkey = await registerPasskey(passkeyPassword, passkeyName.trim() || 'Passkey');
+			passkeys = [...passkeys, passkey];
+			toasts.success('Passkey added');
+			addingPasskey = false;
+			passkeyName = '';
+			passkeyPassword = '';
+		} catch (e) {
+			if (!isPasskeyCancelled(e)) {
+				toasts.error(e instanceof Error ? e.message : 'Failed to add passkey');
+			}
+		} finally {
+			registeringPasskey = false;
+		}
+	}
+
+	async function handleRemovePasskey() {
+		const passkey = removeTarget;
+		removeTarget = null;
+		if (!passkey) return;
+		removingPasskeyId = passkey.id;
+		try {
+			await deletePasskey(passkey.id);
+			passkeys = passkeys.filter((p) => p.id !== passkey.id);
+			toasts.success('Passkey removed');
+		} catch (e) {
+			toasts.error(e instanceof Error ? e.message : 'Failed to remove passkey');
+		} finally {
+			removingPasskeyId = null;
+		}
+	}
+
+	function formatDate(iso: string): string {
+		return new Date(iso).toLocaleDateString();
+	}
 
 	async function handleGenerateKey() {
 		generatingKey = true;
@@ -116,6 +182,122 @@
 			</dl>
 		{/if}
 	</section>
+
+	<!-- Passkeys -->
+	{#if passkeysEnabled}
+		<section class="card p-6 space-y-4">
+			<div>
+				<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Passkeys</h2>
+				<p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+					Sign in without a password using a passkey stored in your password manager (such as
+					Bitwarden) or on your device.
+				</p>
+			</div>
+
+			{#if passkeys.length > 0}
+				<ul class="divide-y divide-gray-200 dark:divide-gray-700">
+					{#each passkeys as passkey (passkey.id)}
+						<li class="flex items-center gap-3 py-2">
+							<span class="i-lucide-key-round text-gray-400"></span>
+							<div class="flex-1 min-w-0">
+								<p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+									{passkey.name}
+								</p>
+								<p class="text-xs text-gray-500 dark:text-gray-400">
+									Added {formatDate(passkey.created_at)}
+									{#if passkey.last_used_at}
+										· Last used {formatDate(passkey.last_used_at)}
+									{/if}
+								</p>
+							</div>
+							<button
+								class="btn-danger flex items-center gap-1.5"
+								onclick={() => (removeTarget = passkey)}
+								disabled={removingPasskeyId === passkey.id}
+							>
+								<span class="i-lucide-trash-2"></span>
+								Remove
+							</button>
+						</li>
+					{/each}
+				</ul>
+			{:else}
+				<p class="text-sm text-gray-500 dark:text-gray-400">No passkeys yet.</p>
+			{/if}
+
+			{#if addingPasskey}
+				<form
+					class="space-y-3"
+					onsubmit={(e) => {
+						e.preventDefault();
+						handleAddPasskey();
+					}}
+				>
+					<div>
+						<label
+							for="passkey-name"
+							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+						>
+							Name
+						</label>
+						<input
+							id="passkey-name"
+							type="text"
+							class="input-base"
+							placeholder="e.g. Bitwarden"
+							maxlength="100"
+							bind:value={passkeyName}
+						/>
+					</div>
+					<div>
+						<label
+							for="passkey-password"
+							class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+						>
+							Current password
+						</label>
+						<input
+							id="passkey-password"
+							type="password"
+							class="input-base"
+							autocomplete="current-password"
+							bind:value={passkeyPassword}
+						/>
+					</div>
+					<div class="flex gap-2">
+						<button
+							type="submit"
+							class="btn-primary flex items-center gap-1.5"
+							disabled={registeringPasskey || !passkeyPassword}
+						>
+							<span class="i-lucide-key-round"></span>
+							{registeringPasskey ? 'Waiting for passkey…' : 'Create Passkey'}
+						</button>
+						<!-- Disabled mid-ceremony: the browser's passkey prompt has its own cancel -->
+						<button
+							type="button"
+							class="btn-secondary"
+							disabled={registeringPasskey}
+							onclick={() => {
+								addingPasskey = false;
+								passkeyPassword = '';
+							}}
+						>
+							Cancel
+						</button>
+					</div>
+				</form>
+			{:else}
+				<button
+					class="btn-primary flex items-center gap-1.5"
+					onclick={() => (addingPasskey = true)}
+				>
+					<span class="i-lucide-plus"></span>
+					Add Passkey
+				</button>
+			{/if}
+		</section>
+	{/if}
 
 	<!-- API Key -->
 	<section class="card p-6 space-y-4">
@@ -255,3 +437,12 @@
 		</div>
 	</section>
 </div>
+
+<ConfirmDialog
+	open={removeTarget !== null}
+	title="Remove Passkey"
+	message="Remove the passkey '{removeTarget?.name}'? You won't be able to sign in with it anymore."
+	confirmLabel="Remove"
+	onconfirm={handleRemovePasskey}
+	oncancel={() => (removeTarget = null)}
+/>

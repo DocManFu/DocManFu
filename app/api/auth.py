@@ -75,6 +75,7 @@ class ApiKeyResponse(BaseModel):
 
 class SetupStatusResponse(BaseModel):
     setup_needed: bool
+    passkeys_enabled: bool
 
 
 # --- Helpers ---
@@ -111,7 +112,10 @@ def _token_response(user: User, token_version: int | None = None) -> TokenRespon
 def get_setup_status(db: Session = Depends(get_db)):
     """Check if initial setup (admin account creation) is needed."""
     user_count = db.query(User).count()
-    return SetupStatusResponse(setup_needed=user_count == 0)
+    return SetupStatusResponse(
+        setup_needed=user_count == 0,
+        passkeys_enabled=bool(settings.WEBAUTHN_ORIGIN),
+    )
 
 
 @router.post("/setup", response_model=TokenResponse)

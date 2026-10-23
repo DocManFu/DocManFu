@@ -1,22 +1,30 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.js';
-	import { checkSetupNeeded, login } from '$lib/api/auth.js';
+	import { getSetupStatus, login } from '$lib/api/auth.js';
+	import { isPasskeyCancelled, loginWithPasskey } from '$lib/api/passkeys.js';
 
 	let username = $state('');
 	let password = $state('');
 	let error = $state('');
 	let loading = $state(false);
 	let checking = $state(true);
+	let passkeysEnabled = $state(false);
+	let passkeyLoading = $state(false);
+	// One sign-in at a time, and ignore results that land after leaving the page
+	const busy = $derived(loading || passkeyLoading);
+	let destroyed = false;
+	onDestroy(() => (destroyed = true));
 
 	onMount(async () => {
 		try {
-			const needed = await checkSetupNeeded();
-			if (needed) {
+			const status = await getSetupStatus();
+			if (status.setup_needed) {
 				goto('/auth/setup');
 				return;
 			}
+			passkeysEnabled = status.passkeys_enabled && !!window.PublicKeyCredential;
 		} catch {
 			// API not available — stay on login
 		}
@@ -25,16 +33,36 @@
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
+		if (busy) return;
 		error = '';
 		loading = true;
 		try {
 			const response = await login(username, password);
+			if (destroyed) return;
 			auth.login(response);
 			goto('/documents');
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Login failed';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function handlePasskey() {
+		if (busy) return;
+		error = '';
+		passkeyLoading = true;
+		try {
+			const response = await loginWithPasskey();
+			if (destroyed) return;
+			auth.login(response);
+			goto('/documents');
+		} catch (err) {
+			if (!isPasskeyCancelled(err)) {
+				error = err instanceof Error ? err.message : 'Passkey sign-in failed';
+			}
+		} finally {
+			passkeyLoading = false;
 		}
 	}
 </script>
@@ -106,7 +134,7 @@
 
 				<button
 					type="submit"
-					disabled={loading || !username || !password}
+					disabled={busy || !username || !password}
 					class="w-full btn btn-primary py-2.5"
 				>
 					{#if loading}
@@ -114,6 +142,27 @@
 					{/if}
 					Sign In
 				</button>
+
+				{#if passkeysEnabled}
+					<div class="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+						<div class="flex-1 border-t border-gray-200 dark:border-gray-700"></div>
+						or
+						<div class="flex-1 border-t border-gray-200 dark:border-gray-700"></div>
+					</div>
+					<button
+						type="button"
+						onclick={handlePasskey}
+						disabled={busy}
+						class="w-full btn btn-secondary py-2.5 flex items-center justify-center gap-2"
+					>
+						{#if passkeyLoading}
+							<span class="i-lucide-loader-2 animate-spin"></span>
+						{:else}
+							<span class="i-lucide-key-round"></span>
+						{/if}
+						Sign in with a passkey
+					</button>
+				{/if}
 			</form>
 		</div>
 	</div>
