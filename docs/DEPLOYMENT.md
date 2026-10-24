@@ -50,7 +50,7 @@ Uploaded files are stored in `./uploads` next to the compose file (change with `
 |-----|----------|
 | `latest`, `main` | The newest build of the `main` branch, published within minutes of every merge |
 | `1.2.0`, `1.2` | A release (`1.2` follows the newest `1.2.x`) |
-| `sha-<commit>` | One exact commit, useful to roll back |
+| `2026.10.23.2154` | One exact build of `main`, by UTC date and time (`YYYY.MM.DD.HHMM`). Pin one to stay put, or to roll back |
 
 The default is `latest`. To stay on releases, set the tag in `.env`:
 
@@ -321,7 +321,7 @@ git pull
 
 Either way, the `migrate` init service runs `alembic upgrade head` before the API and worker start, so schema changes are applied automatically. Back up first (see [Backup & Restore](#backup--restore)) if you're jumping several releases.
 
-To roll back, set `DOCMANFU_VERSION` to the previous release or `sha-<commit>` tag and run the two commands above. Migrations aren't reversed automatically, so restore the database backup if the newer version changed the schema.
+To roll back, set `DOCMANFU_VERSION` to the previous release or date tag (e.g. `2026.10.23.2154`) and run the two commands above. Migrations aren't reversed automatically, so restore the database backup if the newer version changed the schema.
 
 ## Troubleshooting
 
