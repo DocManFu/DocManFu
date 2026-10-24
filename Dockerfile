@@ -1,9 +1,23 @@
 # =============================================================================
-# DocManFu Production Backend Image (multi-stage)
-# Used by: api, worker, migrate services
+# DocManFu Production Image (multi-stage)
+# One image for every service: api, worker and migrate run Python, and the
+# frontend service runs nginx (serving the SPA and proxying /api/ to the api)
 # =============================================================================
 
-# --- Stage 1: Build dependencies ---
+# --- Stage 1: Build the SPA ---
+# The output is static files, so build once on the native platform even when
+# producing images for other architectures
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend
+
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
+# --- Stage 2: Build Python dependencies ---
 FROM python:3.12-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --prefix=/install -r /tmp/requirements.txt
 
-# --- Stage 2: Production runtime ---
+# --- Stage 3: Production runtime ---
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -26,6 +40,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ghostscript \
     unpaper \
     libpq5 \
+    nginx \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python packages from builder
@@ -35,6 +50,10 @@ COPY --from=builder /install /usr/local
 RUN groupadd -g 1000 docmanfu && \
     useradd -u 1000 -g docmanfu -m docmanfu && \
     mkdir -p /app/uploads && chown docmanfu:docmanfu /app/uploads
+
+# Web server for the frontend service (runs as the app user; see nginx.conf)
+COPY frontend/nginx.conf frontend/security-headers.conf frontend/trusted-proxies.conf /etc/nginx/
+COPY --from=frontend /app/build /usr/share/nginx/html
 
 WORKDIR /app
 

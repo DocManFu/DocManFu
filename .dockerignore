@@ -7,7 +7,10 @@ __pycache__
 .env.*
 venv/
 .venv/
-frontend/
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.env*
 uploads/
 backups/
 docs/

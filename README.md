@@ -57,7 +57,7 @@ Services: frontend (`:5180`), API (`:8100`), PostgreSQL (`:5450`), Redis (`:6390
 
 ### Production
 
-Prebuilt images for amd64 and arm64 are published to GHCR on every merge to `main`, so self-hosting needs just two files:
+A single prebuilt image, `ghcr.io/docmanfu/docmanfu` (amd64 and arm64), is published on every merge to `main`, so self-hosting needs just two files:
 
 ```bash
 mkdir docmanfu && cd docmanfu

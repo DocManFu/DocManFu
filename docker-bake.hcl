@@ -1,4 +1,4 @@
-# Builds the API and frontend images together, in parallel.
+# Builds the DocManFu image (API, worker and web frontend in one image).
 # CI (.github/workflows/docker-publish.yml) adds tags and labels on top of this.
 #
 # Local example (builds for the current platform only):
@@ -9,25 +9,15 @@ variable "REGISTRY" {
 }
 
 group "default" {
-  targets = ["api", "frontend"]
+  targets = ["docmanfu"]
 }
 
 # Filled in by docker/metadata-action in CI
-target "docker-metadata-action-api" {}
-target "docker-metadata-action-frontend" {}
+target "docker-metadata-action" {}
 
-target "_common" {
-  platforms = ["linux/amd64", "linux/arm64"]
-}
-
-target "api" {
-  inherits   = ["_common", "docker-metadata-action-api"]
+target "docmanfu" {
+  inherits   = ["docker-metadata-action"]
   context    = "."
-  cache-from = ["type=registry,ref=${REGISTRY}/api:buildcache"]
-}
-
-target "frontend" {
-  inherits   = ["_common", "docker-metadata-action-frontend"]
-  context    = "frontend"
-  cache-from = ["type=registry,ref=${REGISTRY}/frontend:buildcache"]
+  platforms  = ["linux/amd64", "linux/arm64"]
+  cache-from = ["type=registry,ref=${REGISTRY}:buildcache"]
 }

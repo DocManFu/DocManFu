@@ -8,12 +8,7 @@
 
 ## Quick Start (prebuilt images)
 
-DocManFu publishes ready-to-run images to the GitHub Container Registry for `linux/amd64` and `linux/arm64` (Intel/AMD servers, Raspberry Pi 4/5, Apple Silicon):
-
-| Image | Used by |
-|-------|---------|
-| `ghcr.io/docmanfu/docmanfu/api` | `api`, `worker` and `migrate` services |
-| `ghcr.io/docmanfu/docmanfu/frontend` | `frontend` (nginx serving the web app and proxying `/api/`) |
+DocManFu publishes one ready-to-run image, `ghcr.io/docmanfu/docmanfu`, to the GitHub Container Registry for `linux/amd64` and `linux/arm64` (Intel/AMD servers, Raspberry Pi 4/5, Apple Silicon). Every DocManFu service runs from it: `api`, `worker` and `migrate` run the Python app, and `frontend` runs nginx, which serves the web app and proxies `/api/`. PostgreSQL and Redis use their official images.
 
 You don't need to clone the repository, just two files:
 
@@ -51,6 +46,8 @@ Uploaded files are stored in `./uploads` next to the compose file (change with `
 | `latest`, `main` | The newest build of the `main` branch, published within minutes of every merge |
 | `1.2.0`, `1.2` | A release (`1.2` follows the newest `1.2.x`) |
 | `2026.10.23.2154` | One exact build of `main`, by UTC date and time (`YYYY.MM.DD.HHMM`). Pin one to stay put, or to roll back |
+
+(`buildcache` is the CI build cache, not a runnable image.)
 
 The default is `latest`. To stay on releases, set the tag in `.env`:
 
