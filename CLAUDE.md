@@ -254,7 +254,7 @@ Production files:
 - `scripts/restore.sh` — Interactive database restore
 - `docs/DEPLOYMENT.md` — Full deployment guide (prebuilt images, reverse proxy, AI config, scaling, troubleshooting)
 - `docs/BUILD_RUNNERS.md` — How the GHCR images are built: Mac mini primary runner, Beast backup, failover, runner setup
-- Images: `ghcr.io/docmanfu/docmanfu/api` (api/worker/migrate) and `ghcr.io/docmanfu/docmanfu/frontend`; tags `latest`/`main` (every merge), `X.Y.Z`/`X.Y` (releases), `sha-<commit>`. `DOCMANFU_VERSION` in `.env` picks the tag. In the backend Dockerfile, keep app code copied last with no `RUN` after it so code-only builds stay fast
+- Images: `ghcr.io/docmanfu/docmanfu/api` (api/worker/migrate) and `ghcr.io/docmanfu/docmanfu/frontend`; tags `latest`/`main` (every merge), `X.Y.Z`/`X.Y` (releases), CalVer `YYYY.MM.DD.HHMM` (UTC, every merge). `DOCMANFU_VERSION` in `.env` picks the tag. In the backend Dockerfile, keep app code copied last with no `RUN` after it so code-only builds stay fast
 
 ## Rules
 - Don't commit to git unless explicitly told to
