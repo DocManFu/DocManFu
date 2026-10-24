@@ -1,6 +1,7 @@
 name: Publish Docker Images
 
-# Builds ghcr.io/docmanfu/docmanfu/{api,frontend} for linux/amd64 + linux/arm64.
+# Builds ghcr.io/docmanfu/docmanfu (one image for every service) for
+# linux/amd64 + linux/arm64.
 #
 # Runs on self-hosted runners (see docs/BUILD_RUNNERS.md) so the BuildKit cache
 # stays warm between builds: the Mac mini (label docmanfu-mac) normally, Beast
@@ -52,31 +53,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # One CalVer tag (UTC) shared by both images, e.g. 2026.10.23.2154
       - name: CalVer version
         id: calver
         run: echo "version=$(date -u +%Y.%m.%d.%H%M)" >> "$GITHUB_OUTPUT"
 
-      - name: API image tags
-        id: meta-api
+      - name: Image tags
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/api
-          bake-target: docker-metadata-action-api
-          tags: &tags |
+          images: ${{ env.REGISTRY }}
+          tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ steps.calver.outputs.version }},enable={{is_default_branch}}
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-
-      - name: Frontend image tags
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/frontend
-          bake-target: docker-metadata-action-frontend
-          tags: *tags
 
       # Uses the persistent "docmanfu" builder created on each runner, so
       # unchanged layers come from its local cache instead of the registry
@@ -87,13 +78,11 @@ jobs:
           builder: docmanfu
           files: |
             ./docker-bake.hcl
-            cwd://${{ steps.meta-api.outputs.bake-file }}
-            cwd://${{ steps.meta-frontend.outputs.bake-file }}
+            cwd://${{ steps.meta.outputs.bake-file }}
           push: true
           # The registry cache lets the backup runner reuse the other one's layers
           set: |
-            api.cache-to=type=registry,ref=${{ env.REGISTRY }}/api:buildcache,mode=max
-            frontend.cache-to=type=registry,ref=${{ env.REGISTRY }}/frontend:buildcache,mode=max
+            docmanfu.cache-to=type=registry,ref=${{ env.REGISTRY }}:buildcache,mode=max
 
   failover:
     name: Fail over to Beast

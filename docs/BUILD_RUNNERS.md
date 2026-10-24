@@ -1,11 +1,6 @@
 # Image Build Runners
 
-Every merge to `main` (and every published release) builds and pushes the Docker images to GHCR:
-
-- `ghcr.io/docmanfu/docmanfu/api`
-- `ghcr.io/docmanfu/docmanfu/frontend`
-
-Both are built for `linux/amd64` and `linux/arm64` by [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) from [`docker-bake.hcl`](../docker-bake.hcl). See [DEPLOYMENT.md](DEPLOYMENT.md#image-tags) for the tags.
+Every merge to `main` (and every published release) builds and pushes the Docker image `ghcr.io/docmanfu/docmanfu` to GHCR. It holds the API, the Celery worker and the nginx-served web frontend; Compose picks the role per service with `command`. It's built for `linux/amd64` and `linux/arm64` by [`.github/workflows/docker-publish.yml`](../.github/workflows/docker-publish.yml) from [`docker-bake.hcl`](../docker-bake.hcl). See [DEPLOYMENT.md](DEPLOYMENT.md#image-tags) for the tags.
 
 ## Why self-hosted runners
 
@@ -18,7 +13,7 @@ GitHub-hosted runners start every build with an empty cache, and building arm64 
 
 Beast (backup) takes ~50 s warm, but ~80 minutes fully cold because arm64 runs under QEMU on an old Xeon. In practice it pulls most layers from the Mac mini's registry cache instead.
 
-The Dockerfiles are arranged for this: application code is copied last with no `RUN` after it, and the frontend's Node build runs once on the native platform (`--platform=$BUILDPLATFORM`), since its output is static files.
+The Dockerfiles are arranged for this: application code is copied last with no `RUN` after it, and the frontend's Node build stage runs once on the native platform (`--platform=$BUILDPLATFORM`), since its output is static files.
 
 ## The machines
 
@@ -27,7 +22,7 @@ The Dockerfiles are arranged for this: application code is copied last with no `
 | `mac-mini` | Mac mini M4, 192.168.1.6 | `docmanfu-mac` | Primary. Builds arm64 natively and amd64 through Docker Desktop's emulation |
 | `beast` | Beast, Ubuntu x86_64, 192.168.1.4 | `docmanfu-beast` | Backup. Builds amd64 natively and arm64 through QEMU (`qemu-user-static`), so it's much slower when cold |
 
-The workflow's `failover` job (on a GitHub-hosted runner) watches the Mac mini build. If no runner has picked the build up after two minutes, or the build fails, it starts the workflow again with `runner=beast` and cancels the original run. Both runners also push a registry cache (`:buildcache` tags), so Beast reuses the Mac mini's layers instead of starting cold.
+The workflow's `failover` job (on a GitHub-hosted runner) watches the Mac mini build. If no runner has picked the build up after two minutes, or the build fails, it starts the workflow again with `runner=beast` and cancels the original run. Both runners also push a registry cache (the `:buildcache` tag), so Beast reuses the Mac mini's layers instead of starting cold.
 
 To build on a specific machine by hand: **Actions → Publish Docker Images → Run workflow**, then choose the runner (or `gh workflow run docker-publish.yml -f runner=beast`).
 

@@ -76,8 +76,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build backend image
-        run: docker build -t docmanfu-api .
-
-      - name: Build frontend image
-        run: docker build -t docmanfu-frontend frontend/
+      - name: Build image
+        run: docker build -t docmanfu .

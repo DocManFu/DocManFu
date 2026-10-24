@@ -5,7 +5,7 @@
 # Pin a release with DOCMANFU_VERSION in .env (default: latest = main branch)
 # =============================================================================
 
-x-api-image: &api-image ghcr.io/docmanfu/docmanfu/api:${DOCMANFU_VERSION:-latest}
+x-image: &image ghcr.io/docmanfu/docmanfu:${DOCMANFU_VERSION:-latest}
 
 services:
   db:
@@ -47,7 +47,7 @@ services:
         max-file: "5"
 
   migrate:
-    image: *api-image
+    image: *image
     build: .
     command: ["alembic", "upgrade", "head"]
     env_file: .env
@@ -64,7 +64,7 @@ services:
         max-file: "5"
 
   api:
-    image: *api-image
+    image: *image
     build: .
     command: >
       uvicorn app.main:app
@@ -96,7 +96,7 @@ services:
         max-file: "5"
 
   worker:
-    image: *api-image
+    image: *image
     build: .
     command: >
       celery -A app.core.celery_app:celery_app worker
@@ -127,8 +127,9 @@ services:
         max-file: "5"
 
   frontend:
-    image: ghcr.io/docmanfu/docmanfu/frontend:${DOCMANFU_VERSION:-latest}
-    build: ./frontend
+    image: *image
+    build: .
+    command: ["nginx", "-g", "daemon off;"]
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:

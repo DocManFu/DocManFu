@@ -174,6 +174,6 @@ All services run in Docker via `docker-compose.dev.yml` with hot-reload enabled.
 
 ### Production
 
-Multi-stage Docker images keep the final images small. Services communicate over a Docker network — only the frontend (nginx) port is exposed. The `migrate` init container runs Alembic migrations before the API starts.
+One multi-stage image (`ghcr.io/docmanfu/docmanfu`) runs every DocManFu service; Compose picks each role with its `command`. Services communicate over a Docker network — only the frontend (nginx) port is exposed. The `migrate` init container runs Alembic migrations before the API starts.
 
 See [Deployment Guide](DEPLOYMENT.md) for full production setup instructions.

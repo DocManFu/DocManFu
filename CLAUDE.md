@@ -41,12 +41,11 @@ scripts/
   backup.sh             # Database backup script (pg_dump + gzip, retention)
   restore.sh            # Interactive database restore script
 frontend/
-  Dockerfile            # Production frontend image (node build + nginx)
   nginx.conf            # SPA routing + /api proxy + SSE support
   .prettierrc           # Prettier config for Svelte/TS formatting
 Dockerfile              # Production backend image (multi-stage, non-root)
 docker-compose.yml      # Production compose (db, redis, migrate, api, worker, frontend); images from GHCR, or built locally
-docker-bake.hcl         # Multi-arch (amd64+arm64) build of the api + frontend images, used by docker-publish.yml
+docker-bake.hcl         # Multi-arch (amd64+arm64) build of the single image, used by docker-publish.yml
 docker-compose.dev.yml  # Development compose
 dev                     # Development CLI wrapper
 prod                    # Production CLI wrapper
@@ -245,16 +244,15 @@ Ollama profiles (optional — activate with `--profile`):
 Services: `frontend` (port 8080 — nginx SPA + API proxy), `api`, `worker`, `db`, `redis`, `migrate` (one-shot), `ollama`/`ollama-cpu` (optional via profile)
 
 Production files:
-- `Dockerfile` — Multi-stage backend image (builder + runtime with tesseract/ghostscript, non-root user)
-- `frontend/Dockerfile` — Multi-stage frontend image (node build + nginx)
-- `frontend/nginx.conf` — SPA routing + `/api/` proxy to backend + SSE support
+- `Dockerfile` — The one production image for every service (SPA build stage + Python deps stage + runtime with tesseract/ghostscript/nginx, non-root user). The `frontend` service runs it with `nginx -g 'daemon off;'`
+- `frontend/nginx.conf` — SPA routing + `/api/` proxy to backend + SSE support (runs as the non-root user, so pid/temp files go to /tmp)
 - `docker-compose.yml` — Production compose (db → redis → migrate → api + worker → frontend)
 - `.env.production.example` — Production env template
 - `scripts/backup.sh` — Database backup with retention cleanup
 - `scripts/restore.sh` — Interactive database restore
 - `docs/DEPLOYMENT.md` — Full deployment guide (prebuilt images, reverse proxy, AI config, scaling, troubleshooting)
 - `docs/BUILD_RUNNERS.md` — How the GHCR images are built: Mac mini primary runner, Beast backup, failover, runner setup
-- Images: `ghcr.io/docmanfu/docmanfu/api` (api/worker/migrate) and `ghcr.io/docmanfu/docmanfu/frontend`; tags `latest`/`main` (every merge), `X.Y.Z`/`X.Y` (releases), CalVer `YYYY.MM.DD.HHMM` (UTC, every merge). `DOCMANFU_VERSION` in `.env` picks the tag. In the backend Dockerfile, keep app code copied last with no `RUN` after it so code-only builds stay fast
+- Image: `ghcr.io/docmanfu/docmanfu` (one image for api/worker/migrate/frontend); tags `latest`/`main` (every merge), `X.Y.Z`/`X.Y` (releases), CalVer `YYYY.MM.DD.HHMM` (UTC, every merge). `DOCMANFU_VERSION` in `.env` picks the tag. In the backend Dockerfile, keep app code copied last with no `RUN` after it so code-only builds stay fast
 
 ## Rules
 - Don't commit to git unless explicitly told to
