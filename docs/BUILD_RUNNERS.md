@@ -62,8 +62,14 @@ curl -fsSL https://github.com/actions/runner/releases/download/v2.338.1/actions-
 mkdir -p .docker
 ln -sfn ~/.docker/cli-plugins .docker/cli-plugins   # Mac only
 echo "DOCKER_CONFIG=$HOME/actions-runner-docmanfu/.docker" > .env
-# PATH for jobs. Mac mini: /Users/dustin/.docker/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-echo "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" > .path
+
+# PATH for jobs
+echo "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" > .path   # Linux
+# Mac: keep the keychain credential helpers (in ~/.docker/bin and
+# /usr/local/bin) off PATH. A background service can't use the keychain
+# ("User interaction is not allowed"), so docker login would fail
+mkdir -p bin && ln -sfn ~/.docker/bin/docker bin/docker
+echo "$PWD/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" > .path
 
 # The persistent builder the workflow uses. Its cache is garbage-collected
 # above maxUsedSpace (40GB on the Mac mini, 20GB on Beast)
