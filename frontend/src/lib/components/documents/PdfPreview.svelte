@@ -8,251 +8,108 @@
 
 	pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
-	interface Props {
-		src: string;
-		highlight?: string;
-	}
-	let { src, highlight = '' }: Props = $props();
-
-	let canvasContainer: HTMLDivElement;
+	interface Props { src: string; highlight?: string; ondownload?: () => void; }
+	let { src, highlight = '', ondownload }: Props = $props();
+	let canvasContainer = $state<HTMLDivElement>();
 	let loading = $state(true);
 	let error = $state('');
 	let pageCount = $state(0);
 	let matchCount = $state(0);
-	let highlightActive = $state(!!highlight);
+	let highlightActive = $state(true);
+	let zoom = $state(1);
+	let pdf: pdfjsLib.PDFDocumentProxy | undefined;
+	let resizeObserver: ResizeObserver | undefined;
+	let renderVersion = 0;
 
-	function highlightMatches(textLayerDiv: HTMLElement, query: string) {
+	function highlightMatches(layer: HTMLElement, query: string) {
 		if (!query.trim()) return 0;
 		const words = query.trim().toLowerCase().split(/\s+/);
 		let count = 0;
-		for (const span of textLayerDiv.querySelectorAll('span')) {
-			const text = span.textContent?.toLowerCase() ?? '';
-			if (words.some((w) => text.includes(w))) {
-				span.classList.add('highlight');
-				count++;
+		for (const span of layer.querySelectorAll('span')) {
+			if (words.some((word) => (span.textContent?.toLowerCase() ?? '').includes(word))) {
+				span.classList.add('highlight'); count++;
 			}
 		}
 		return count;
 	}
 
-	function clearHighlights() {
-		highlightActive = false;
+	async function renderPages() {
+		if (!pdf || !canvasContainer) return;
+		const version = ++renderVersion;
+		const width = canvasContainer.clientWidth;
+		if (!width) return;
+		canvasContainer.replaceChildren();
 		matchCount = 0;
-		for (const el of canvasContainer.querySelectorAll('.highlight')) {
-			el.classList.remove('highlight');
+		const dpr = window.devicePixelRatio || 1;
+		for (let number = 1; number <= pdf.numPages; number++) {
+			const page = await pdf.getPage(number);
+			if (version !== renderVersion) return;
+			const base = page.getViewport({ scale: 1 });
+			const viewport = page.getViewport({ scale: (width / base.width) * zoom });
+			const pageDiv = document.createElement('div');
+			pageDiv.className = 'pdf-page shadow-sm';
+			pageDiv.style.width = `${Math.floor(viewport.width)}px`;
+			pageDiv.style.height = `${Math.floor(viewport.height)}px`;
+			const canvas = document.createElement('canvas');
+			canvas.width = Math.floor(viewport.width * dpr);
+			canvas.height = Math.floor(viewport.height * dpr);
+			canvas.style.width = `${Math.floor(viewport.width)}px`;
+			canvas.style.height = `${Math.floor(viewport.height)}px`;
+			pageDiv.appendChild(canvas);
+			const layer = document.createElement('div');
+			layer.className = 'textLayer';
+			pageDiv.appendChild(layer);
+			canvasContainer.appendChild(pageDiv);
+			const context = canvas.getContext('2d')!;
+			context.scale(dpr, dpr);
+			await page.render({ canvas, canvasContext: context, viewport }).promise;
+			if (version !== renderVersion) return;
+			await new TextLayer({ textContentSource: await page.getTextContent(), container: layer, viewport }).render();
+			if (highlightActive) matchCount += highlightMatches(layer, highlight);
 		}
 	}
 
-	onMount(() => {
-		let pdf: pdfjsLib.PDFDocumentProxy | undefined;
+	function setZoom(value: number) { zoom = value; void renderPages(); }
+	function clearHighlights() { highlightActive = false; void renderPages(); }
 
+	onMount(() => {
 		(async () => {
 			try {
 				const state = get(auth);
 				const httpHeaders: Record<string, string> = {};
-				if (state.accessToken) {
-					httpHeaders['Authorization'] = `Bearer ${state.accessToken}`;
-				}
+				if (state.accessToken) httpHeaders.Authorization = `Bearer ${state.accessToken}`;
 				pdf = await pdfjsLib.getDocument({ url: src, httpHeaders }).promise;
 				pageCount = pdf.numPages;
 				loading = false;
-
-				const containerWidth = canvasContainer.clientWidth;
-				const dpr = window.devicePixelRatio || 1;
-
-				for (let i = 1; i <= pdf.numPages; i++) {
-					const page = await pdf.getPage(i);
-					const unscaledViewport = page.getViewport({ scale: 1 });
-					const scale = containerWidth / unscaledViewport.width;
-					const viewport = page.getViewport({ scale });
-
-					// Page wrapper (positions text layer over canvas)
-					const pageDiv = document.createElement('div');
-					pageDiv.style.position = 'relative';
-					pageDiv.style.width = `${Math.floor(viewport.width)}px`;
-					pageDiv.style.height = `${Math.floor(viewport.height)}px`;
-					pageDiv.className = 'shadow-sm';
-
-					// Canvas for rendering
-					const canvas = document.createElement('canvas');
-					canvas.width = Math.floor(viewport.width * dpr);
-					canvas.height = Math.floor(viewport.height * dpr);
-					canvas.style.width = `${Math.floor(viewport.width)}px`;
-					canvas.style.height = `${Math.floor(viewport.height)}px`;
-					canvas.style.display = 'block';
-					pageDiv.appendChild(canvas);
-
-					// Text layer for selection
-					const textLayerDiv = document.createElement('div');
-					textLayerDiv.className = 'textLayer';
-					pageDiv.appendChild(textLayerDiv);
-
-					canvasContainer.appendChild(pageDiv);
-
-					// Render canvas
-					const ctx = canvas.getContext('2d')!;
-					ctx.scale(dpr, dpr);
-					await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-
-					// Render text layer
-					const textContent = await page.getTextContent();
-					const textLayer = new TextLayer({
-						textContentSource: textContent,
-						container: textLayerDiv,
-						viewport,
-					});
-					await textLayer.render();
-
-					// Highlight search matches
-					if (highlight && highlightActive) {
-						matchCount += highlightMatches(textLayerDiv, highlight);
-					}
-				}
-
-				// Scroll first match into view
-				if (highlightActive && matchCount > 0) {
-					const first = canvasContainer.querySelector('.highlight');
-					first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-				}
-			} catch (e) {
-				error = e instanceof Error ? e.message : 'Failed to load PDF';
-				loading = false;
-			}
+				await renderPages();
+				resizeObserver = new ResizeObserver(() => void renderPages());
+				resizeObserver.observe(canvasContainer!);
+			} catch (e) { error = e instanceof Error ? e.message : 'Failed to load PDF'; loading = false; }
 		})();
-
-		return () => {
-			pdf?.destroy();
-		};
+		return () => { resizeObserver?.disconnect(); pdf?.destroy(); };
 	});
 </script>
 
-<div class="flex flex-col h-full bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden">
+<div class="flex flex-col h-full min-h-0 bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden">
+	<div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400">
+		{#if pageCount > 0}<span class="inline-flex items-center"><span class="i-lucide-file-text mr-1"></span>{pageCount} {pageCount === 1 ? 'page' : 'pages'}</span>{/if}
+		<label class="inline-flex items-center gap-2 ml-auto"><span>{Math.round(zoom * 100)}%</span><input aria-label="Zoom PDF" type="range" min="0.75" max="2" step="0.25" value={zoom} onchange={(event) => setZoom(Number(event.currentTarget.value))} /></label>
+		<button class="btn-ghost btn-sm" onclick={() => setZoom(1)}>Fit width</button>
+		<a class="btn-ghost btn-sm no-underline" href={src} target="_blank" rel="noopener noreferrer">Open PDF</a>
+		{#if ondownload}<button class="btn-ghost btn-sm" onclick={ondownload}>Download PDF</button>{/if}
+		{#if highlightActive && matchCount > 0}<span class="text-amber-600 dark:text-amber-400">{matchCount} {matchCount === 1 ? 'match' : 'matches'}</span><button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Clear highlights" onclick={clearHighlights}><span class="i-lucide-x text-sm"></span></button>{/if}
+	</div>
 	{#if error}
-		<div class="flex-1 flex items-center justify-center">
-			<span class="i-lucide-alert-circle text-red-400 mr-2"></span>
-			<span class="text-gray-600 dark:text-gray-400">{error}</span>
-		</div>
+		<div class="flex-1 flex items-center justify-center p-4 text-center"><span class="i-lucide-alert-circle text-red-400 mr-2"></span><span class="text-gray-600 dark:text-gray-400">{error}</span></div>
 	{:else}
-		{#if pageCount > 0}
-			<div
-				class="flex items-center px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400"
-			>
-				<span class="i-lucide-file-text mr-1"></span>
-				{pageCount}
-				{pageCount === 1 ? 'page' : 'pages'}
-				{#if highlightActive && matchCount > 0}
-					<span class="mx-2 text-gray-300 dark:text-gray-600">|</span>
-					<span class="text-amber-600 dark:text-amber-400">
-						{matchCount}
-						{matchCount === 1 ? 'match' : 'matches'}
-					</span>
-					<button
-						class="ml-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-						title="Clear highlights"
-						onclick={clearHighlights}
-					>
-						<span class="i-lucide-x text-sm"></span>
-					</button>
-				{/if}
-			</div>
-		{/if}
-		<div class="flex-1 overflow-y-auto p-4">
-			{#if loading}
-				<div class="flex items-center justify-center h-full">
-					<span class="i-lucide-loader-2 text-2xl text-gray-400 animate-spin"></span>
-				</div>
-			{/if}
-			<div bind:this={canvasContainer} class="flex flex-col items-center gap-2"></div>
-		</div>
+		<div class="flex-1 min-h-0 overflow-auto p-3">{#if loading}<div class="flex items-center justify-center h-full"><span class="i-lucide-loader-2 text-2xl text-gray-400 animate-spin"></span></div>{/if}<div bind:this={canvasContainer} class="flex flex-col items-center gap-3"></div></div>
 	{/if}
 </div>
 
 <style>
-	/* PDF.js text layer styles — enables text selection over rendered canvases */
-	:global(.textLayer) {
-		position: absolute;
-		text-align: initial;
-		inset: 0;
-		overflow: clip;
-		opacity: 1;
-		line-height: 1;
-		-webkit-text-size-adjust: none;
-		-moz-text-size-adjust: none;
-		text-size-adjust: none;
-		forced-color-adjust: none;
-		transform-origin: 0 0;
-		caret-color: CanvasText;
-		z-index: 0;
-	}
-
-	:global(.textLayer) {
-		--min-font-size: 1;
-		--text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
-		--min-font-size-inv: calc(1 / var(--min-font-size));
-	}
-
-	:global(.textLayer :is(span, br)) {
-		color: transparent;
-		position: absolute;
-		white-space: pre;
-		cursor: text;
-		transform-origin: 0% 0%;
-	}
-
-	:global(.textLayer > :not(.markedContent)),
-	:global(.textLayer .markedContent span:not(.markedContent)) {
-		z-index: 1;
-		--font-height: 0;
-		font-size: calc(var(--text-scale-factor) * var(--font-height));
-		--scale-x: 1;
-		--rotate: 0deg;
-		transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
-	}
-
-	:global(.textLayer .markedContent) {
-		display: contents;
-	}
-
-	:global(.textLayer span[role='img']) {
-		-webkit-user-select: none;
-		-moz-user-select: none;
-		user-select: none;
-		cursor: default;
-	}
-
-	:global(.textLayer ::-moz-selection) {
-		background: rgba(0, 0, 255, 0.25);
-	}
-
-	:global(.textLayer ::selection) {
-		background: rgba(0, 0, 255, 0.25);
-	}
-
-	:global(.textLayer br::-moz-selection) {
-		background: transparent;
-	}
-
-	:global(.textLayer br::selection) {
-		background: transparent;
-	}
-
-	:global(.textLayer .highlight) {
-		background: rgba(251, 191, 36, 0.4);
-		border-radius: 2px;
-	}
-
-	:global(.textLayer .endOfContent) {
-		display: block;
-		position: absolute;
-		inset: 100% 0 0;
-		z-index: 0;
-		cursor: default;
-		-webkit-user-select: none;
-		-moz-user-select: none;
-		user-select: none;
-	}
-
-	:global(.textLayer.selecting .endOfContent) {
-		top: 0;
-	}
+	:global(.pdf-page) { position: relative; flex: none; }
+	:global(.textLayer) { position: absolute; inset: 0; overflow: clip; line-height: 1; z-index: 1; }
+	:global(.textLayer span) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0; }
+	:global(.textLayer ::selection) { background: rgba(0, 0, 255, 0.25); }
+	:global(.textLayer .highlight) { background: rgba(251, 191, 36, 0.4); border-radius: 2px; }
 </style>
