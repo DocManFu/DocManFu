@@ -354,10 +354,10 @@
 		</div>
 	</div>
 {:else if doc}
-	<div class="flex h-[calc(100vh-4rem)]">
-		<!-- Left sidebar: metadata -->
+	<div class="flex flex-col md:flex-row h-auto md:h-[calc(100vh-4rem)]">
+		<!-- Metadata follows the reader on mobile and remains the left sidebar on desktop. -->
 		<div
-			class="w-sm flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-900"
+			class="order-2 md:order-1 w-full md:w-sm flex-shrink-0 border-t md:border-t-0 md:border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4 space-y-4 bg-white dark:bg-gray-900"
 		>
 			<a
 				href={backUrl}
@@ -803,8 +803,8 @@
 			</div>
 		</div>
 
-		<!-- Right: document viewer -->
-		<div class="flex-1 min-w-0">
+		<!-- Reader is first and takes a usable viewport height on phones. -->
+		<div class="document-viewer order-1 md:order-2 flex-1 min-w-0 h-[70dvh] md:h-auto">
 			{#if doc.mime_type.startsWith('image/')}
 				<div
 					class="h-full flex items-center justify-center bg-gray-50 dark:bg-gray-800 p-4 overflow-auto"
@@ -818,7 +818,11 @@
 					{/if}
 				</div>
 			{:else}
-				<PdfPreview src={getDownloadUrl(doc.id)} highlight={searchQuery} />
+				<PdfPreview
+					src={getDownloadUrl(doc.id)}
+					highlight={searchQuery}
+					ondownload={() => doc && downloadDocument(doc.id, displayName + '.pdf')}
+				/>
 			{/if}
 		</div>
 	</div>
