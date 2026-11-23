@@ -10,6 +10,7 @@
 
 	interface Props { src: string; highlight?: string; ondownload?: () => void; }
 	let { src, highlight = '', ondownload }: Props = $props();
+	let viewport = $state<HTMLDivElement>();
 	let canvasContainer = $state<HTMLDivElement>();
 	let loading = $state(true);
 	let error = $state('');
@@ -20,6 +21,9 @@
 	let pdf: pdfjsLib.PDFDocumentProxy | undefined;
 	let resizeObserver: ResizeObserver | undefined;
 	let renderVersion = 0;
+	let lastRenderedWidth = 0;
+	let activeRenderWidth = 0;
+	let renderTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function highlightMatches(layer: HTMLElement, query: string) {
 		if (!query.trim()) return 0;
@@ -33,28 +37,40 @@
 		return count;
 	}
 
-	async function renderPages() {
-		if (!pdf || !canvasContainer) return;
+
+	function scheduleRender(force = false) {
+		if (!viewport || !pdf) return;
+		const width = Math.floor(viewport.clientWidth);
+		if (!width || (!force && (width === lastRenderedWidth || width === activeRenderWidth))) return;
+		if (renderTimer !== undefined) clearTimeout(renderTimer);
+		renderTimer = setTimeout(() => {
+			renderTimer = undefined;
+			void renderPages(width);
+		}, 0);
+	}
+
+	async function renderPages(width: number) {
+		if (!pdf || !canvasContainer || !width) return;
 		const version = ++renderVersion;
-		const width = canvasContainer.clientWidth;
-		if (!width) return;
+		activeRenderWidth = width;
 		canvasContainer.replaceChildren();
-		matchCount = 0;
 		const dpr = window.devicePixelRatio || 1;
+		let nextMatchCount = 0;
+
 		for (let number = 1; number <= pdf.numPages; number++) {
 			const page = await pdf.getPage(number);
 			if (version !== renderVersion) return;
 			const base = page.getViewport({ scale: 1 });
-			const viewport = page.getViewport({ scale: (width / base.width) * zoom });
+			const pageViewport = page.getViewport({ scale: (width / base.width) * zoom });
 			const pageDiv = document.createElement('div');
 			pageDiv.className = 'pdf-page shadow-sm';
-			pageDiv.style.width = `${Math.floor(viewport.width)}px`;
-			pageDiv.style.height = `${Math.floor(viewport.height)}px`;
+			pageDiv.style.width = `${Math.floor(pageViewport.width)}px`;
+			pageDiv.style.height = `${Math.floor(pageViewport.height)}px`;
 			const canvas = document.createElement('canvas');
-			canvas.width = Math.floor(viewport.width * dpr);
-			canvas.height = Math.floor(viewport.height * dpr);
-			canvas.style.width = `${Math.floor(viewport.width)}px`;
-			canvas.style.height = `${Math.floor(viewport.height)}px`;
+			canvas.width = Math.floor(pageViewport.width * dpr);
+			canvas.height = Math.floor(pageViewport.height * dpr);
+			canvas.style.width = `${Math.floor(pageViewport.width)}px`;
+			canvas.style.height = `${Math.floor(pageViewport.height)}px`;
 			pageDiv.appendChild(canvas);
 			const layer = document.createElement('div');
 			layer.className = 'textLayer';
@@ -62,15 +78,22 @@
 			canvasContainer.appendChild(pageDiv);
 			const context = canvas.getContext('2d')!;
 			context.scale(dpr, dpr);
-			await page.render({ canvas, canvasContext: context, viewport }).promise;
+			await page.render({ canvas, canvasContext: context, viewport: pageViewport }).promise;
 			if (version !== renderVersion) return;
-			await new TextLayer({ textContentSource: await page.getTextContent(), container: layer, viewport }).render();
-			if (highlightActive) matchCount += highlightMatches(layer, highlight);
+			await new TextLayer({ textContentSource: await page.getTextContent(), container: layer, viewport: pageViewport }).render();
+			if (version !== renderVersion) return;
+			if (highlightActive) nextMatchCount += highlightMatches(layer, highlight);
 		}
+
+		if (version !== renderVersion) return;
+		matchCount = nextMatchCount;
+		lastRenderedWidth = width;
+		activeRenderWidth = 0;
+		loading = false;
 	}
 
-	function setZoom(value: number) { zoom = value; void renderPages(); }
-	function clearHighlights() { highlightActive = false; void renderPages(); }
+	function setZoom(value: number) { zoom = value; scheduleRender(true); }
+	function clearHighlights() { highlightActive = false; scheduleRender(true); }
 
 	onMount(() => {
 		(async () => {
@@ -80,13 +103,17 @@
 				if (state.accessToken) httpHeaders.Authorization = `Bearer ${state.accessToken}`;
 				pdf = await pdfjsLib.getDocument({ url: src, httpHeaders }).promise;
 				pageCount = pdf.numPages;
-				loading = false;
-				await renderPages();
-				resizeObserver = new ResizeObserver(() => void renderPages());
-				resizeObserver.observe(canvasContainer!);
+				scheduleRender(true);
+				resizeObserver = new ResizeObserver(() => scheduleRender());
+				resizeObserver.observe(viewport!);
 			} catch (e) { error = e instanceof Error ? e.message : 'Failed to load PDF'; loading = false; }
 		})();
-		return () => { resizeObserver?.disconnect(); pdf?.destroy(); };
+		return () => {
+			renderVersion++;
+			if (renderTimer !== undefined) clearTimeout(renderTimer);
+			resizeObserver?.disconnect();
+			pdf?.destroy();
+		};
 	});
 </script>
 
@@ -102,7 +129,10 @@
 	{#if error}
 		<div class="flex-1 flex items-center justify-center p-4 text-center"><span class="i-lucide-alert-circle text-red-400 mr-2"></span><span class="text-gray-600 dark:text-gray-400">{error}</span></div>
 	{:else}
-		<div class="flex-1 min-h-0 overflow-auto p-3">{#if loading}<div class="flex items-center justify-center h-full"><span class="i-lucide-loader-2 text-2xl text-gray-400 animate-spin"></span></div>{/if}<div bind:this={canvasContainer} class="flex flex-col items-center gap-3"></div></div>
+		<div bind:this={viewport} class="flex-1 min-h-0 min-w-0 overflow-x-auto overflow-y-scroll overscroll-contain p-3" style="scrollbar-gutter: stable;">
+			{#if loading}<div class="flex items-center justify-center h-full"><span class="i-lucide-loader-2 text-2xl text-gray-400 animate-spin"></span></div>{/if}
+			<div bind:this={canvasContainer} class="flex min-w-max flex-col items-center gap-3"></div>
+		</div>
 	{/if}
 </div>
 

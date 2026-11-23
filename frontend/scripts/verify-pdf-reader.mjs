@@ -12,6 +12,12 @@ assert.match(viewer, /aria-label="Zoom PDF"/);
 assert.match(viewer, /Fit width/);
 assert.match(viewer, /Open PDF/);
 assert.match(viewer, /Download PDF/);
-assert.match(viewer, /ResizeObserver/);
+assert.match(viewer, /ResizeObserver\(\(\) => scheduleRender\(\)\)/);
+assert.match(viewer, /resizeObserver\.observe\(viewport!/);
+assert.doesNotMatch(viewer, /resizeObserver\.observe\(canvasContainer/);
+assert.match(viewer, /width === lastRenderedWidth/);
+assert.match(viewer, /renderVersion = 0/);
+assert.match(viewer, /renderVersion\+\+/);
+assert.match(viewer, /min-w-0 overflow-x-auto overflow-y-scroll/);
 
-console.log('PDF reader responsive contract verified');
+console.log('PDF reader stable-render responsive contract verified');
